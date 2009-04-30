@@ -1,0 +1,33 @@
+Just compile and run
+
+	./mole your_example.ll_net
+
+The input format are PEP low-level nets extended with
+an additional section for read arcs. Some simple examples
+are in the Examples/ directory, hopefully they are enough
+to clarify the input syntax.
+
+Mole produces dot-compatible output, so you can get
+a Postscript file of the result by saying
+
+	./mole your_example.ll_net | dot -Tps > your_example.ps
+	gv your_example.ps
+
+Right now the tool has the following restrictions:
+* It works with safe nets only.
+* It has not at all been thoroughly tested. In fact, it may very well
+  crash on any example other than the ones in the Example/ directory.
+  Let me know of any bugs you encounter, including the examples that
+  cause them.
+* The algorithm is actually cheating by reducing the problem to the
+  ones with consume/produce loops and then extracting the read-arc-
+  unfolding from that (bigger) unfolding ;-) Option -f outputs this
+  bigger unfolding instead.
+
+Stefan
+
+
+Version history:
+* 0.0.1, March 19, 2007: initial version
+* 0.0.2, March 19, 2007: fixed compilation problems with gcc4
+* 0.0.3, March 21, 2007: added -f option
