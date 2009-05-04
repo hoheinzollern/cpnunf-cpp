@@ -9,7 +9,7 @@ INCLUDES =
 ##############################################################
 
 DEBUG = -g
-WARNINGS = -Wall
+WARNINGS = -Wall -pedantic
 
 CC = gcc $(DEBUG) $(INCLUDES) $(WARNINGS) $(FLAGS)
 SHELL = /bin/sh

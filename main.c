@@ -27,6 +27,12 @@ void usage(char *myname)
 
 /*****************************************************************************/
 
+/**
+ * Prova di documentazione, funzione main.
+ * \param argc
+ * \param argv 
+ * \return the exitcode
+ */
 int main (int argc, char **argv)
 {
 	int	 i;

@@ -10,17 +10,17 @@
     <projectname>Unfolder</projectname>
     <projectdirectory>.</projectdirectory>
     <absoluteprojectpath>false</absoluteprojectpath>
-    <description></description>
-    <defaultencoding></defaultencoding>
+    <description/>
+    <defaultencoding/>
     <versioncontrol/>
   </general>
   <kdevcustomproject>
     <run>
       <directoryradio>executable</directoryradio>
-      <mainprogram>/home/alessandro/Documents/Tesi/mora-070321</mainprogram>
-      <programargs>Examples/mid3.ll_net</programargs>
-      <globaldebugarguments></globaldebugarguments>
-      <globalcwd>/home/alessandro/Documents/Tesi/mora-070321</globalcwd>
+      <mainprogram>/home/alessandro/Documents/Tesi/mora-070321/mora</mainprogram>
+      <programargs>mid3.ll_net</programargs>
+      <globaldebugarguments/>
+      <globalcwd>/home/alessandro/Documents/Tesi/mora-070321/Examples</globalcwd>
       <useglobalprogram>false</useglobalprogram>
       <terminal>false</terminal>
       <autocompile>false</autocompile>
@@ -47,13 +47,13 @@
     <blacklist/>
     <build>
       <buildtool>make</buildtool>
-      <builddir></builddir>
+      <builddir/>
     </build>
     <other>
       <prio>0</prio>
-      <otherbin></otherbin>
-      <defaulttarget></defaulttarget>
-      <otheroptions></otheroptions>
+      <otherbin/>
+      <defaulttarget/>
+      <otheroptions/>
       <selectedenvironment>default</selectedenvironment>
       <environments>
         <default/>
@@ -64,9 +64,9 @@
       <numberofjobs>0</numberofjobs>
       <prio>0</prio>
       <dontact>false</dontact>
-      <makebin></makebin>
-      <defaulttarget></defaulttarget>
-      <makeoptions></makeoptions>
+      <makebin/>
+      <defaulttarget/>
+      <makeoptions/>
       <selectedenvironment>default</selectedenvironment>
       <environments>
         <default/>
@@ -75,11 +75,11 @@
   </kdevcustomproject>
   <kdevdebugger>
     <general>
-      <dbgshell></dbgshell>
+      <dbgshell/>
       <gdbpath>/home/alessandro/Documents/Tesi/mora-070321/mora</gdbpath>
-      <configGdbScript></configGdbScript>
-      <runShellScript></runShellScript>
-      <runGdbScript></runGdbScript>
+      <configGdbScript/>
+      <runShellScript/>
+      <runGdbScript/>
       <breakonloadinglibs>true</breakonloadinglibs>
       <separatetty>false</separatetty>
       <floatingtoolbar>false</floatingtoolbar>
@@ -181,7 +181,7 @@
       <includePaths>.;</includePaths>
     </codecompletion>
     <creategettersetter>
-      <prefixGet></prefixGet>
+      <prefixGet/>
       <prefixSet>set</prefixSet>
       <prefixVariable>m_,_</prefixVariable>
       <parameterName>theValue</parameterName>

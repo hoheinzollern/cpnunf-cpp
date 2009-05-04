@@ -30,9 +30,9 @@ nodelist_t *cutoff_list, *corr_list;	/* cut-off list, corresponding events */
 /* to the concurrent transitions follow, the end is signalled by a NULL.     */
 
 /* Create an empty coarray with 'size' allocated events. */
-int* alloc_coarray (int size)
+COARRAY_TYPE* alloc_coarray (int size)
 {
-	int *newarray = MYmalloc((size+3) * sizeof(int));
+	COARRAY_TYPE *newarray = MYmalloc((size+3) * sizeof(COARRAY_TYPE));
 	newarray[0] = size;
 	newarray[1] = 0;
 	newarray[2] = 0;
@@ -40,27 +40,27 @@ int* alloc_coarray (int size)
 }
 
 /* Add a single condition to an array, enlarging the array if necessary. */
-void addto_coarray (int **array, cond_t *co)
+void addto_coarray (COARRAY_TYPE **array, cond_t *co)
 {
 	int pos;
 
 	if ((*array)[1] == (*array)[0])
 	{
-		int newsize = ((*array)[0] + 1) + ((*array)[0] / 4);
-		*array = MYrealloc(*array,(newsize+3) * sizeof(int));
+		COARRAY_TYPE newsize = ((*array)[0] + 1) + ((*array)[0] / 4);
+		*array = MYrealloc(*array,(newsize+3) * sizeof(COARRAY_TYPE));
 		(*array)[0] = newsize;
 	}
 	pos = 2 + (*array)[1]++;
-	(*array)[pos] = (int)co;
+	(*array)[pos] = (COARRAY_TYPE)co;
 	(*array)[pos+1] = 0;
 }
 
 /* Copy an array, truncating it to the necessary size. */
-int* coarray_copy (int* array)
+COARRAY_TYPE* coarray_copy (COARRAY_TYPE* array)
 {
-	int *newarray = MYmalloc((array[1]+3) * sizeof(int));
+	COARRAY_TYPE *newarray = MYmalloc((array[1]+3) * sizeof(COARRAY_TYPE));
 	newarray[0] = array[1];
-	memcpy(newarray+1,array+1,(array[1]+2) * sizeof(int));
+	memcpy(newarray+1,array+1,(array[1]+2) * sizeof(COARRAY_TYPE));
 	return newarray;
 }
 
@@ -147,7 +147,7 @@ void add_post_conditions (event_t *ev, char cutoff)
 {
 	cond_t **co_ptr, **cocoptr;
 	nodelist_t *list;
-	int *newarray;
+	COARRAY_TYPE *newarray;
 
 	/* First insert the conditions without putting them in pl->conds;
 	   that is done by pe() to avoid duplicated new events. */

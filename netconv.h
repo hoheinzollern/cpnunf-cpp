@@ -7,6 +7,8 @@
 #ifndef __NETCONV_H__
 #define __NETCONV_H__
 
+#define COARRAY_TYPE long
+
 /****************************************************************************/
 
 typedef unsigned char uchar;
@@ -48,8 +50,8 @@ typedef struct cond_t
 	struct place_t *origin;	    /* associated place			    */
 	int    num;		    /* number (needed by co_relation)	    */
 	int    mark;		    /* used by marking_of		    */
-	int   *coarray_common;	    /* list of co-conditions		    */
-	int   *coarray_private;     /* list of co-conditions		    */
+	COARRAY_TYPE   *coarray_common;	    /* list of co-conditions		    */
+	COARRAY_TYPE   *coarray_private;     /* list of co-conditions		    */
 	struct cond_t *phantom;	    /* cheat: pointer back to "real" cond   */
 	struct cond_t *compressed;  /* corresponding condition in c_unf	    */
 } cond_t;
@@ -61,7 +63,7 @@ typedef struct event_t
 	struct cond_t **postset;    /* size fixed by sizes of origin	    */
 	struct trans_t *origin;	    /* associated transition		    */
 	int    mark;		    /* used by marking_of		    */
-	int   *coarray;
+	COARRAY_TYPE   *coarray;
 	short  foata_level;
 	short  preset_size, postset_size;
 	struct event_t *phantom;
