@@ -44,7 +44,13 @@
       <filetype>Makefile</filetype>
       <filetype>CMakeLists.txt</filetype>
     </filetypes>
-    <blacklist/>
+    <blacklist>
+      <path>CMakeFiles</path>
+      <path>CMakeFiles/CompilerIdC</path>
+      <path>CMakeFiles/CompilerIdC/CMakeCCompilerId.c</path>
+      <path>CMakeFiles/CompilerIdCXX</path>
+      <path>CMakeFiles/CompilerIdCXX/CMakeCXXCompilerId.cpp</path>
+    </blacklist>
     <build>
       <buildtool>make</buildtool>
       <builddir/>

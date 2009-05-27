@@ -1,14 +1,7 @@
 <?xml version = '1.0' encoding = 'UTF-8'?>
 <!DOCTYPE KDevPrjSession>
 <KDevPrjSession>
- <DocsAndViews NumberOfDocuments="2" >
-  <Doc0 NumberOfViews="1" URL="file:///home/alessandro/Documents/Tesi/mora-070321/main.c" >
-   <View0 Encoding="" Type="Source" />
-  </Doc0>
-  <Doc1 NumberOfViews="1" URL="file:///home/alessandro/Documents/Tesi/mora-070321/netconv.h" >
-   <View0 Encoding="" line="11" Type="Source" />
-  </Doc1>
- </DocsAndViews>
+ <DocsAndViews NumberOfDocuments="0" />
  <pluginList>
   <kdevdebugger>
    <breakpointList/>

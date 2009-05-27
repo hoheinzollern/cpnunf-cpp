@@ -64,10 +64,11 @@ COARRAY_TYPE* coarray_copy (COARRAY_TYPE* array)
 	return newarray;
 }
 
-/*****************************************************************************/
-/* Insert a condition into the unfolding. The new condition is labelled with */
-/* the place pl.							     */
-
+/**
+ * Insert a condition into the unfolding. The new condition is labelled with
+ * the place pl. If ev is present then it is added to phantom, the collection
+ * of read arcs.
+ */
 cond_t* insert_condition (place_t *pl, event_t *ev)
 {
 	nodelist_t *list;
@@ -76,8 +77,10 @@ cond_t* insert_condition (place_t *pl, event_t *ev)
         co->next = unf->conditions;
         unf->conditions = co;
 
-	/* remember relation between co and pl */
-	/* the other direction is done in pe() */
+	/**
+	 * remember relation between co and pl
+	 * the other direction is done in pe()
+	 */
 	co->origin = pl;
 
         co->postset = NULL;
@@ -89,9 +92,11 @@ cond_t* insert_condition (place_t *pl, event_t *ev)
 
 	if (!ev) return co;
 
-	/* Is this place connected with a read arc? If yes, find the
-	   corresponding place in the preset of the event and set
-	   co->phantom accordingly. */
+	/**
+	 * Is this place connected with a read arc? If yes, find the
+	 * corresponding place in the preset of the event and set
+	 * co->phantom accordingly.
+	 */
 	for (list = ev->origin->readarcs; list; list = list->next)
 		if (list->node == pl)
 		{
@@ -104,10 +109,10 @@ cond_t* insert_condition (place_t *pl, event_t *ev)
 	return co;
 }
 
-/*****************************************************************************/
-/* Insert an event into the unfolding. The new event is derived from	     */
-/* qu->trans and the conditions in qu->conds form its preset.		     */
-
+/**
+ * Insert an event into the unfolding. The new event is derived from
+ * qu->trans and the conditions in qu->conds form its preset.
+ */
 event_t* insert_event (pe_queue_t *qu)
 {
         event_t *ev = MYmalloc(sizeof(event_t));
@@ -138,19 +143,21 @@ event_t* insert_event (pe_queue_t *qu)
 	return ev;
 }
 
-/*****************************************************************************/
-/* Add the post-conditions of event ev and compute the possible extensions.  */
-
 enum { CUTOFF_NO, CUTOFF_YES };
 
+/**
+ * Add the post-conditions of event ev and compute the possible extensions.
+ */
 void add_post_conditions (event_t *ev, char cutoff)
 {
 	cond_t **co_ptr, **cocoptr;
 	nodelist_t *list;
 	COARRAY_TYPE *newarray;
 
-	/* First insert the conditions without putting them in pl->conds;
-	   that is done by pe() to avoid duplicated new events. */
+	/**
+	 * First insert the conditions without putting them in pl->conds;
+	 * that is done by pe() to avoid duplicated new events.
+	 */
 	ev->postset = co_ptr
 		= MYmalloc(ev->postset_size * sizeof(cond_t*));
 	for (list = ev->origin->postset; list; list = list->next)
@@ -158,9 +165,11 @@ void add_post_conditions (event_t *ev, char cutoff)
 
 	if (cutoff) return;
 
-	/* Having computed the common part of the co-relation for all
-	   conditions in co_relation(), we create a copy that uses only
-	   the necessary amount of memory. */
+	/**
+	 * Having computed the common part of the co-relation for all
+	 * conditions in co_relation(), we create a copy that uses only
+	 * the necessary amount of memory.
+	 */
 	newarray = coarray_copy(ev->coarray);
 	free(ev->coarray);
 
@@ -192,20 +201,15 @@ void add_post_conditions (event_t *ev, char cutoff)
 	}
 }
 
-/*****************************************************************************/
-/* Function co_relation computes the set of conditions that are concurrent   */
-/* to the newly added event ev. That set of conditions is also concurrent to */
-/* the postset of ev and forms the common part of their concurrency list.    */
-/* The set is essentially computed by taking the intersection of the sets of */
-/* conditions concurrent to the input conditions of ev.			     */
-
 typedef struct cqentry_t {
 	cond_t *co;
 	int index;
 	struct cqentry_t *next;
 } cqentry_t;
 
-/* This maintains a queue of conditions used for computing the intersection. */
+/**
+ * This maintains a queue of conditions used for computing the intersection.
+ */
 void insert_to_queue (cqentry_t **queue, cqentry_t *newentry,
 			cond_t *co, int index)
 {
@@ -218,6 +222,13 @@ void insert_to_queue (cqentry_t **queue, cqentry_t *newentry,
 	*queue = newentry;
 }
 
+/**
+ * Function co_relation computes the set of conditions that are concurrent
+ * to the newly added event ev. That set of conditions is also concurrent to
+ * the postset of ev and forms the common part of their concurrency list.
+ * The set is essentially computed by taking the intersection of the sets of
+ * conditions concurrent to the input conditions of ev.
+ */
 void co_relation (event_t *ev)
 {
 	cond_t  **co_ptr, ***colists;
@@ -315,6 +326,9 @@ void recursive_pe (nodelist_t *list)
 
 /*****************************************************************************/
 
+/**
+ * Computes the unfolding of the net
+ */
 void unfold ()
 {
 	nodelist_t *list;

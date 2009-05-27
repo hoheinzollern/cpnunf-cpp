@@ -40,8 +40,9 @@ extern nodelist_t* marking_initial ();
 /***************************************************************************/
 /* declarations for pe.c						   */
 
-/* An entry in the queue of possible extensions. Contains information
-   relevant to the chosen adequate total ordering.			*/
+/** An entry in the queue of possible extensions. Contains information
+ *  relevant to the chosen adequate total ordering.
+ */
 typedef struct pe_queue_t
 {
 	int lc_size;			/* size of local configuration	*/

@@ -8,10 +8,9 @@
 
 #include "common.h"
 
-/****************************************************************************/
-/* nc_error								    */
-/* Outputs an error message to stderr and exits.			    */
-
+/**
+ * Outputs an error message to stderr and exits.
+ */
 void nc_error (const char* msg, ...)
 {
 	va_list	the_args;
@@ -23,10 +22,10 @@ void nc_error (const char* msg, ...)
 	exit(1);
 }
 
-/****************************************************************************/
-/* nc_warning								    */
-/* Emits a warning, but doesn't terminate.				    */
-
+/**
+ * nc_warning
+ * Emits a warning, but doesn't terminate.
+ */
 void nc_warning (const char* msg, ...)
 {
 	va_list	the_args;
@@ -37,9 +36,9 @@ void nc_warning (const char* msg, ...)
 	va_end(the_args);
 }
 
-/****************************************************************************/
-/* Wrapper functions for memory allocation.				    */
-
+/**
+ * Wrapper function for memory allocation.
+ */
 void* MYmalloc(size_t size)
 {
 	void * m;
@@ -47,6 +46,9 @@ void* MYmalloc(size_t size)
 	return m;
 }
 
+/**
+ * Wrapper function for memory allocation.
+ */
 void* MYcalloc(size_t size)
 {
 	void * m;
@@ -55,6 +57,9 @@ void* MYcalloc(size_t size)
 	return m;
 }
 
+/**
+ * Wrapper function for memory allocation.
+ */
 void* MYrealloc(void *ptr, size_t size)
 {
 	void *r;
@@ -62,11 +67,12 @@ void* MYrealloc(void *ptr, size_t size)
 	return r;
 }
 
+/**
+ * Wrapper function for memory allocation.
+ */
 char* MYstrdup(char *string)
 {
 	char *str;
 	if (!(str = strdup(string))) nc_error("memory allocation rejected!");
 	return str;
 }
-
-/****************************************************************************/

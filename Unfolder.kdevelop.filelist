@@ -1,4 +1,5 @@
 # KDevelop Custom Project File List
+CMakeLists.txt
 Makefile
 common.c
 common.h

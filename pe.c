@@ -3,17 +3,21 @@
 
 /*****************************************************************************/
 
-/* The worklist of possible extensions is organized as a priority heap
-   using an array (of pointers). The array is extended in steps of size
-   PE_ALLOC_STEP as needed.						*/
+/**
+ * The worklist of possible extensions is organized as a priority heap
+ * using an array (of pointers). The array is extended in steps of size
+ * PE_ALLOC_STEP as needed.
+ */
 
 #define PE_ALLOC_STEP 1024
 pe_queue_t **pe_queue;		/* the priority array */
 int pe_qsize, pe_qalloc;	/* current/maximum capacity */
 
-/* This structure (a list of node lists) is used during the search for
-   possible extensions to enumerate all potential sets conditions for a
-   given transition.							*/
+/**
+ * This structure (a list of node lists) is used during the search for
+ * possible extensions to enumerate all potential sets conditions for a
+ * given transition.
+ */
 typedef struct pe_comb_t
 {
 	nodelist_t *current;
@@ -24,10 +28,10 @@ pe_comb_t *pe_combs;	/* used in pe() */
 cond_t   **pe_conds;	/* array of conditions, given by pe() to pe_insert() */
 uchar     *pe0_conflicts;	/* conflicts of the initial conditions */
 
-/*****************************************************************************/
-/* Simple functions: initialize queue, release a queue entry, and release    */
-/* memory allocated during initialization.				     */
-
+/**
+ * Simple functions: initialize queue, release a queue entry, and release
+ * memory allocated during initialization.
+ */
 void pe_init (nodelist_t *m0)
 {
 	int i;
@@ -56,9 +60,9 @@ void pe_finish ()
 	free(pe_combs);
 }
 
-/*****************************************************************************/
-/* Adds the possible extension (tr,pe_conds) to the priority queue.	     */
-
+/**
+ * Adds the possible extension (tr,pe_conds) to the priority queue.
+ */
 void pe_insert (trans_t *tr)
 {
 	pe_queue_t *qu_new = create_queue_entry(tr);
@@ -79,9 +83,9 @@ void pe_insert (trans_t *tr)
 	pe_queue[index] = qu_new;
 }
 
-/*****************************************************************************/
-/* Remove the minimal event from the queue and restore order.		     */
-
+/**
+ * Remove the minimal event from the queue and restore order.
+ */
 pe_queue_t* pe_pop ()
 {
 	pe_queue_t *first = pe_queue[1];
@@ -114,11 +118,11 @@ pe_queue_t* pe_pop ()
 	return first;
 }
 
-/*****************************************************************************/
-/* Check whether any pair of conditions downwards from curr is in conflict   */
-/* The check excludes the condition given to pe(), because we already know   */
-/* that that one is not in conflict with any of the others.		     */
-
+/**
+ * Check whether any pair of conditions downwards from curr is in conflict
+ * The check excludes the condition given to pe(), because we already know
+ * that that one is not in conflict with any of the others.
+ */
 char pe_conflict (pe_comb_t *curr)
 {
 	int sz;
@@ -155,9 +159,9 @@ char pe_conflict (pe_comb_t *curr)
 	return 0;
 }
 
-/*****************************************************************************/
-/* Find the new possible extensions created by the addition of co.	     */
-
+/**
+ * Find the new possible extensions created by the addition of co.
+ */
 void pe (cond_t *co)
 {
 	nodelist_t *pl_post, *tr_pre, **compat_conds;
