@@ -93,10 +93,16 @@ typedef struct event_t
 /**
  * Co-array structure, also used for qco-relation.
  */
-typedef struct co_array_t {
+typedef struct co_cond_t {
 	cond_t *cond;		// condition in co-array
-	hist_t **hist;		// array of concurrent histories
-} co_array_t;
+	short hists_len;
+	hist_t **hists;		// array of concurrent histories
+} co_cond_t;
+
+typedef struct co_t {
+	int len;
+	struct co_cond_t *conds;
+} co_t;
 
 /**
  * net_t: this structure represents the net
