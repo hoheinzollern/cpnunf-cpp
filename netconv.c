@@ -9,6 +9,9 @@
 #include "netconv.h"
 #include "unfold.h"
 
+int event_last = -1;
+int cond_last = 0;
+
 /****************************************************************************/
 /* nc_create_net							    */
 /* Creates a new net without places or transitions.			    */
@@ -25,9 +28,8 @@ net_t* nc_create_net()
 unf_t* nc_create_unfolding()
 {
 	unf_t *unf = MYmalloc(sizeof(unf_t));
-	unf->conditions = NULL;
-	unf->events = NULL;
-	unf->numco = unf->numev = 0;
+	unf->conditions = g_hash_table_new(NULL, NULL);
+	unf->events = g_hash_table_new(NULL, NULL);
 	return unf;
 }
 
@@ -123,9 +125,73 @@ void nc_static_checks (net_t* net, char *stoptr_name)
 	if (!pl) nc_error("no initial marking");
 }
 
+gint nc_compare(gconstpointer a, gconstpointer b)
+{
+	if (a>b) return 1;
+	if (a==b) return 0;
+	if (a<b) return -1;
+}
+
+/**
+ * Creates a new condition given a place and it's pre-event
+ */
+cond_t *nc_cond_new(place_t *pl, event_t *ev)
+{
+	struct cond_t *cond = (cond_t*)MYmalloc(sizeof(cond_t));
+	cond->num = cond_last++;
+	
+	cond->pre_ev = ev;
+	cond->origin = pl;
+	
+	cond->postset = g_array_new(FALSE, TRUE, sizeof(event_t *));
+	cond->readarcs = g_array_new(FALSE, TRUE, sizeof(event_t *));
+	
+	cond->co_private = g_hash_table_new(NULL, NULL);
+	
+	return cond;
+}
+
 /**
  * Creates an event for the unfolding
  */
-event_t nc_event_new()
+event_t *nc_event_new(trans_t *tr, GArray *pre, GArray *read)
 {
+	event_t *ev = (event_t*)MYmalloc(sizeof(event_t));
+	ev->num = event_last++;
+	
+	ev->origin = tr;
+	ev->preset = pre;
+	ev->readarcs = read;
+	
+	// Adds a new condition for each place in the postset:
+	GArray *post = ev->postset = g_array_new(FALSE, FALSE,
+		sizeof(cond_t *));
+	// TODO: alternativa: g_array_sized_new con dimensione tr->postset_size
+	nodelist_t *ps = tr->postset;
+	while (ps) {
+		cond_t *cond = nc_cond_new(ps->node, ev);
+		g_array_append_val(post, cond);
+		ps = ps->next;
+	}
+	g_array_sort(post, nc_compare);
+	
+	ev->co = g_hash_table_new(NULL, NULL);
+	ev->qco = g_hash_table_new(NULL, NULL);
+	ev->hist = g_hash_table_new(NULL, NULL);
+	
+	return ev;
+}
+
+/**
+ * Adds an event and it's postset to the unfolding
+ */
+void nc_add_event(event_t *ev)
+{
+	g_hash_table_insert(unf->conditions, ev, ev);
+	int size = ev->postset->len, i;
+	for (i=0; i<size; i++)
+	{
+		cond_t *cond = g_array_index(ev->postset, cond_t *, i);
+		g_hash_table_insert(unf->events, cond, cond);
+	}
 }
