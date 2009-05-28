@@ -63,7 +63,7 @@ void pe_finish ()
 /**
  * Adds the possible extension (tr,pe_conds) to the priority queue.
  */
-void pe_insert (trans_t *tr)
+void pe_insert (hist_t *h)
 {
 	pe_queue_t *qu_new = create_queue_entry(tr);
 	int index = ++pe_qsize;
@@ -119,117 +119,8 @@ pe_queue_t* pe_pop ()
 }
 
 /**
- * Check whether any pair of conditions downwards from curr is in conflict
- * The check excludes the condition given to pe(), because we already know
- * that that one is not in conflict with any of the others.
- */
-char pe_conflict (pe_comb_t *curr)
-{
-	int sz;
-	cond_t *co, **co_ptr;
-	event_t *ev, **queue;
-
-	/* just one condition - no conflict */
-	if (curr == pe_combs) return 0;
-
-	++ev_mark;
-	*(queue = events) = NULL;
-
-	/* put the pre-events into the queue */
-	while (curr >= pe_combs)
-	{
-		(co = (curr--)->current->node)->mark = ev_mark;
-		if ((ev = co->pre_ev) && ev->mark != ev_mark)
-			 (*++queue = ev)->mark = ev_mark;
-	}
-
-	/* go upwards, try to find two paths converging at some condition */
-	while ((ev = *queue))
-	{
-		queue--;
-		for (sz = ev->origin->preset_size, co_ptr = ev->preset; sz--; )
-		{
-			if ((co = *co_ptr++)->mark == ev_mark) return 1;
-			co->mark = ev_mark;
-			if ((ev = co->pre_ev) && ev->mark != ev_mark)
-				 (*++queue = ev)->mark = ev_mark;
-		}
-	}
-
-	return 0;
-}
-
-/**
  * Find the new possible extensions created by the addition of co.
  */
-void pe (cond_t *co)
+void pe (event_t *ev)
 {
-	nodelist_t *pl_post, *tr_pre, **compat_conds;
-	pe_comb_t *curr_comb;
-	cond_t **cocoptr;
-	place_t *pl = co->origin, *pl2;
-	trans_t *tr;
-
-	*pe_conds = co;	/* any new PE contains co */
-	nodelist_push(&(pl->conds),co);
-
-	/* check the transitions in pl's postset */
-	for (pl_post = pl->postset; pl_post; pl_post = pl_post->next)
-	{
-		tr = pl_post->node;
-		(curr_comb = pe_combs)->start = NULL;
-
-		/* for every other post-place of tr, collect the conditions
-			that are co-related to co in the comb structure */
-		for (tr_pre = tr->preset; tr_pre; tr_pre = tr_pre->next)
-		{
-			if ((pl2 = tr_pre->node) == pl) continue;
-
-			compat_conds = &(curr_comb->start);
-			cocoptr = ((cond_t**)(co->coarray_common))+1;
-			while (*++cocoptr)
-				if ((*cocoptr)->origin == pl2)
-				    nodelist_push(compat_conds,*cocoptr);
-			cocoptr = ((cond_t**)(co->coarray_private))+1;
-			while (*++cocoptr)
-				if ((*cocoptr)->origin == pl2)
-				    nodelist_push(compat_conds,*cocoptr);
-
-			if (!*compat_conds) break;
-
-			curr_comb->current = curr_comb->start;
-			(++curr_comb)->start = NULL;
-		}
-
-		/* find all non-conflicting combinations in the comb */
-		curr_comb = pe_combs;
-		if (!tr_pre) while (curr_comb >= pe_combs)
-		{
-			if (!curr_comb->start)
-			{
-				cond_t **co_ptr = pe_conds;
-				for (curr_comb = pe_combs; curr_comb->start;
-						curr_comb++)
-					*++co_ptr = curr_comb->current->node;
-				pe_insert(tr);
-				curr_comb--;
-			}
-			else if (!pe_conflict(curr_comb))
-			{
-				curr_comb++;
-				continue;
-			}
-
-			while (curr_comb >= pe_combs && !(curr_comb->current =
-						curr_comb->current->next))
-			{
-				curr_comb->current = curr_comb->start;
-				curr_comb--;
-			}
-		}
-
-		/* release the comb lists */
-		for (curr_comb = pe_combs; curr_comb->start; curr_comb++)
-			nodelist_delete(curr_comb->start);
-	}
 }

@@ -122,3 +122,10 @@ void nc_static_checks (net_t* net, char *stoptr_name)
 		if (pl->marked) break;
 	if (!pl) nc_error("no initial marking");
 }
+
+/**
+ * Creates an event for the unfolding
+ */
+event_t nc_event_new()
+{
+}

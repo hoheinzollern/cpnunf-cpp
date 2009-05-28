@@ -7,14 +7,11 @@
 #ifndef __NETCONV_H__
 #define __NETCONV_H__
 
-#define COARRAY_TYPE long
+#include <glib.h>
 
-/****************************************************************************/
+#define COARRAY_TYPE void
 
 typedef unsigned char uchar;
-
-/****************************************************************************/
-/* structures for places, transitions, conditions, events		    */
 
 /* If you change these structures, do keep the "next" field at the top;
    reverse_list() depends on it.					    */
@@ -22,57 +19,80 @@ typedef unsigned char uchar;
 typedef struct place_t
 {
 	struct place_t *next;
-	char  *name;		    /* short name			    */
-	int    num;		    /* number				    */
-	struct nodelist_t *preset;  /* unordered list of preset		    */
-	struct nodelist_t *postset; /* unordered list of postset	    */
-	struct nodelist_t *readarcs; /* read arcs (unordered) */
-	struct nodelist_t *conds;   /* conditions derived from this place   */
-	char marked;		    /* non-zero if place is marked	    */
+	char  *name;			// short name
+	int    num;			// number
+	struct nodelist_t *preset;	// unordered list of preset
+	struct nodelist_t *postset;	// unordered list of postset
+	struct nodelist_t *readarcs;	// read arcs (unordered)
+	struct nodelist_t *conds;	// conditions derived from this place
+	char marked;		 	// non-zero if place is marked
 } place_t;
 
 typedef struct trans_t
 {
 	struct trans_t *next;
-	char  *name;		    /* short name			    */
-	int    num;		    /* number				    */
-	struct nodelist_t *preset;  /* unordered list of preset		    */
-	struct nodelist_t *postset; /* unordered list of postset	    */
-	struct nodelist_t *readarcs; /* read arcs (unordered) */
+	char  *name;			// short name
+	int    num;			// number
+	struct nodelist_t *preset;	// ordered array of preset
+	struct nodelist_t *postset;	// ordered array of postset
+	struct nodelist_t *readarcs;	// read arcs (ordered)
 	short  preset_size, postset_size, readarc_size;
 } trans_t;
 
 typedef struct cond_t
 {
 	struct cond_t *next;
-	struct event_t *pre_ev;	    /* the single event in the preset	    */
-	struct nodelist_t *postset; /* unordered list of postset	    */
-	struct place_t *origin;	    /* associated place			    */
-	int    num;		    /* number (needed by co_relation)	    */
-	int    mark;		    /* used by marking_of		    */
-	COARRAY_TYPE   *coarray_common;	    /* list of co-conditions		    */
-	COARRAY_TYPE   *coarray_private;     /* list of co-conditions		    */
-	struct cond_t *phantom;	    /* cheat: pointer back to "real" cond   */
-	struct cond_t *compressed;  /* corresponding condition in c_unf	    */
+	struct event_t *pre_ev;		// the single event in the preset
+	struct event_t **postset;	// ordered array of postset
+	struct event_t **readarcs;	// read arcs (ordered)
+	struct place_t *origin;		// associated place
+	int    num;			// number (needed by co_relation)
+	int    mark;			// used by marking_of
+	GHashTable *co_private;		// array of co-conditions
 } cond_t;
 
 typedef struct event_t
 {
 	struct event_t *next;
-	struct cond_t **preset;	    /* array of preset/postset conditions   */
-	struct cond_t **postset;    /* size fixed by sizes of origin	    */
-	struct trans_t *origin;	    /* associated transition		    */
-	int    mark;		    /* used by marking_of		    */
-	COARRAY_TYPE   *coarray;
+	struct cond_t **preset;		// array of preset/postset conditions
+	struct cond_t **postset;	// size fixed by sizes of origin
+	struct cond_t **readarcs;	// read arcs (ordered)
+	struct trans_t *origin;		// associated transition
+	int    mark;			// used by marking_of
+	GHashTable   *co;
+	GHashTable   *qco;
 	short  foata_level;
 	short  preset_size, postset_size;
-	struct event_t *phantom;
-	struct event_t *compressed;
 } event_t;
 
-/****************************************************************************/
-/* structures for net and unfolding					    */
+/**
+ * This structure is used to define the list of predecessors for H
+ */
+typedef struct pred_t {
+	struct hist_t *hist;
+} pred_t;
 
+/**
+ * this structure defines an history as an event plus the list of it's predecessors
+ */
+typedef struct hist_t {
+	int size;			// size of the history
+	struct event_t *e;		// last event in history
+	struct mark_t *mark;		// marking of the history
+	struct pred_t **pred;		// the predecessors
+} hist_t;
+
+/**
+ * Co-array structure, also used for qco-relation.
+ */
+typedef struct co_array_t {
+	struct cond_t *cond;		// condition in co-array
+	struct hist_t **hist;		// array of concurrent histories
+} co_array_t;
+
+/**
+ * net_t: this structure represents the net
+ */
 typedef struct
 {
 	place_t *places;	/* pointer to first place		*/
@@ -82,6 +102,9 @@ typedef struct
 	int maxra;		/* maximum readarcs of transitions      */
 } net_t;
 
+/**
+ * unf_t: this structure represents the unfolding
+ */
 typedef struct
 {
 	cond_t *conditions;	/* pointer to first condition		*/
@@ -125,10 +148,5 @@ extern net_t* read_pep_net(char*);
 
 extern void write_dot_output (unf_t*, nodelist_t*, char);
 extern void* reverse_list (void*);
-
-/****************************************************************************/
-/* declarations for compress.c						    */
-
-extern void compress_unfolding ();
 
 #endif

@@ -16,8 +16,6 @@
 extern net_t *net;	/* stores the net	*/
 extern unf_t *unf;	/* stores the unfolding */
 
-extern unf_t *c_unf;	/* readarc-compressed unfolding */
-
 extern int conditions_size, events_size;
 extern int ev_mark;		  	   /* needed for various procedures */
 extern event_t **events;

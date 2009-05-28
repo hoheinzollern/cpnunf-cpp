@@ -58,13 +58,7 @@ int main (int argc, char **argv)
 
 	unfold();
 
-	if (COMPRESS)
-	{
-		compress_unfolding();
-		write_dot_output(c_unf,c_cutoffs,1);
-	}
-	else
-		write_dot_output(unf,cutoff_list,0);
+	write_dot_output(unf,cutoff_list,0);
 
 	return exitcode;
 }
