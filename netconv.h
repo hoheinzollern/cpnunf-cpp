@@ -55,9 +55,11 @@ typedef struct hist_t {
 	int size;			// size of the history
 	struct event_t *e;		// last event in history
 	struct mark_t *mark;		// marking of the history
-	struct pred_t **pred;		// the predecessors, ordered by b
+	struct pred_t *pred;		// the predecessors, ordered by b
+	int pred_n;			// the number of predecessors
 } hist_t;
 
+#define HAS_FLAG(flags, flag) ((flags) & (flag) != 0)
 #define HIST_R 0x01
 #define HIST_C 0x02
 
@@ -65,8 +67,8 @@ typedef struct hist_t {
  * This structure is used to define the list of predecessors for H
  */
 typedef struct pred_t {
-	uchar flag;		// marks the type of history chosen
-	struct cond_b *cond;
+	uchar flags;		// marks the type of history chosen
+	struct cond_t *cond;
 	struct hist_t *hist;
 } pred_t;
 
@@ -100,7 +102,7 @@ typedef struct event_t
  */
 typedef struct co_cond_t {
 	cond_t *cond;		// condition in co-array
-	short hists_len;
+	int hists_len;
 	hist_t **hists;		// array of concurrent histories
 } co_cond_t;
 

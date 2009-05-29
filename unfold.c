@@ -40,8 +40,8 @@ co_t *co_new(int size)
 co_t *co_copy(co_t *orig)
 {
 	co_t *co = co_new(orig->len);
-	co_cont_t *co_cond, orig_cond = orig->conds;
-	for (co_cond = co->conds; co_cond<co->conds+size;
+	co_cond_t *co_cond, *orig_cond = orig->conds;
+	for (co_cond = co->conds; co_cond < co->conds+co->len;
 		    ++co_cond, ++orig_cond) {
 		co_cond->cond = orig_cond->cond;
 		co_cond->hists_len = orig_cond->hists_len;
@@ -73,16 +73,16 @@ void co_finalize(co_t *co)
  */
 void hist_intersect(hist_t **a, int len_a, hist_t ***b, int *len_b)
 {
-	int size_b = len_b;
+	int size_b = *len_b;
 	*len_b = 0;
 	hist_t	**last_a = a + len_a,
-		**last_b = *b + len_b,
+		**last_b = *b + *len_b,
 		**cur_b = *b;
 	
 	// intersects the history arrays
-	while (a < last_a || *b < last_b) {
+	while (a < last_a && *b < last_b) {
 		if (*a == **b) {
-			*cur_b = a;
+			cur_b = a;
 			a++; b++; cur_b++; (*len_b)++;
 		} else if (*a < **b) a++;
 		else b++;
@@ -105,7 +105,7 @@ void co_intersect(co_t *a, co_t *b)
 		*cond_b = b->conds, *lastcond_b = b->conds + b->len,
 		*cond_c = cond_b;
 	
-	while (cond_a < lastcond_a || cond_b < lastcond_b) {
+	while (cond_a < lastcond_a && cond_b < lastcond_b) {
 		if (cond_a->cond == cond_b->cond) {
 			// a == b is a condition present in both co-arrays
 			cond_c->cond = cond_a->cond;
@@ -139,14 +139,6 @@ void co_intersect(co_t *a, co_t *b)
 }
 
 /**
- * Computes the intersection between the co union qco and int;
- * stores the result in int.
- */
-void co_u_qco_intersect(co_t *co, co_t *qco, co_t *int)
-{
-}
-
-/**
  * takes a co structure and eliminates the preset of a given event
  * note that preset and the co structure are both ordered on conditions
  */
@@ -157,7 +149,7 @@ void co_drop_preset(co_t *co, event_t *ev)
 	GArray *pre = ev->preset;
 	int i = 0;
 	
-	while (i < pre->len || cond2 < lastcond) {
+	while (i < pre->len && cond2 < lastcond) {
 		if (g_array_index(pre, cond_t *, i) == cond2->cond) {
 			free(cond2->hists);
 			cond2->hists = NULL;
@@ -178,22 +170,194 @@ void co_drop_preset(co_t *co, event_t *ev)
 }
 
 /**
- * computes the union of two co relations
+ * Copies a co-condition from src to dst
+ */
+void co_cond_copy(co_cond_t *dst, co_cond_t *src)
+{
+	dst->cond = src->cond;
+	dst->hists_len = src->hists_len;
+	dst->hists = MYmalloc(sizeof(hist_t *) * dst->hists_len);
+	memcpy(dst->hists, src->hists, sizeof(hist_t *) * dst->hists_len);
+}
+
+/**
+ * Creates the union of h1 and h2 and stores it in h3 (allocating a new
+ * memory area for this).
+ */
+void hist_union(hist_t **h1, int len_h1, hist_t **h2, int len_h2,
+		hist_t ***h3, int *len_h3)
+{
+	*h3 = MYmalloc(sizeof(hist_t *) * (len_h1 + len_h2));
+	int i=0, j=0, k=0;
+	while (i < len_h1 && j < len_h2) {
+		if (h1[i] < h2[j]) {
+			(*h3)[k] = h1[i];
+			k++; i++;
+		} else if (h1[i] == h2[j]) {
+			(*h3)[k] = h1[i];
+			k++; i++; j++;
+		} else {
+			(*h3)[k] = h2[j];
+			k++; j++;
+		}
+	}
+	while (i < len_h1) {
+		(*h3)[k] = h1[i];
+		k++; i++;
+	}
+	while (j < len_h2) {
+		(*h3)[k] = h2[j];
+		k++; j++;
+	}
+	*len_h3 = k;
+	// TODO: strip the size of the union
+}
+
+/**
+ * Computes the union of two co relations
  */
 co_t *co_union(co_t *a, co_t *b)
 {
+	co_t *c = co_new(a->len + b->len);
+	c->len = 0;
 	
+	co_cond_t *cond_a = a->conds, *cond_b = b->conds, *cond_c = c->conds;
+	co_cond_t *last_a = a->conds + a->len,
+		  *last_b = b->conds + b->len;
+	while (cond_a < last_a && cond_b < last_b) {
+		if (cond_a->cond < cond_b->cond) {
+			co_cond_copy(cond_a, cond_c);
+			cond_a++;
+		} else if (cond_a->cond == cond_b->cond) {
+			cond_c->cond = cond_a->cond;
+			hist_union(cond_a->hists, cond_a->hists_len,
+				   cond_b->hists, cond_b->hists_len,
+				   &(cond_c->hists), &(cond_c->hists_len));
+		} else {
+			co_cond_copy(cond_b, cond_c);
+			cond_b++;
+		}
+		c->len++;
+		cond_c++;
+	}
+	while (cond_a < last_a) {
+		co_cond_copy(cond_a, cond_c);
+		cond_a++;
+		c->len++;
+		cond_c++;
+	}
+	while (cond_b < last_b) {
+		co_cond_copy(cond_b, cond_c);
+		cond_b++;
+		c->len++;
+		cond_c++;
+	}
+	
+	return c;
 }
 
+/**
+ * Given an enriched event e, returns the pairs <b, H> in the postset of e
+ * as a co structure.
+ */
+co_t *co_postset_e(hist_t *hist)
+{
+	GArray *post = hist->e->postset;
+	co_t *co = co_new(post->len);
+	co_cond_t *cond = co->conds, *last_cond = co->conds + co->len;
+	int i = 0;
+	while (cond < last_cond) {
+		cond->cond = g_array_index(post, cond_t *, i);
+		cond->hists_len = 1;
+		cond->hists = MYmalloc(sizeof(hist_t *));
+		*(cond->hists) = hist;
+		cond++; i++;
+	}
+}
+
+/**
+ * Computes the co-relation given an enriched event. See theory at section
+ * "Keeping co and qco-relations" for details.
+ */
 co_t *co_relation(hist_t *hist)
 {
-	
+	pred_t *pred = hist->pred, *last_pred = hist->pred + hist->pred_n;
+	co_t *tmp = NULL;
+	while (pred < last_pred) {
+		if (HAS_FLAG(pred->flags, HIST_C)) {
+			co_t *co_b = co_union(
+				(co_t*)g_hash_table_lookup(
+					pred->cond->co_private, pred->hist),
+	 			(co_t*)g_hash_table_lookup(
+					pred->hist->e->co, pred->hist)
+			);
+			if (tmp)
+				co_intersect(co_b, tmp);
+			else
+				tmp = co_b;
+			co_finalize(co_b);
+		} else if (HAS_FLAG(pred->flags, HIST_R)) {
+			co_t *co_b = co_union(
+				g_hash_table_lookup(pred->cond->co_private,
+					pred->hist),
+				g_hash_table_lookup(pred->hist->e->co,
+					pred->hist)
+					     );
+			co_t *co_qco_b = co_union(co_b,
+				g_hash_table_lookup(pred->hist->e->qco,
+					pred->hist)
+						 );
+			if (tmp)
+				co_intersect(co_qco_b, tmp);
+			else
+				tmp = co_qco_b;
+			co_finalize(co_b);
+			co_finalize(co_qco_b);
+		}
+		pred++;
+	}
+	co_drop_preset(tmp, hist->e);
+	co_t *result = co_union(tmp, co_postset_e(hist));
+	co_finalize(tmp);
+	return result;
 }
 
+/**
+ * Computes the qco-relation given an enriched event.
+ */
 co_t *qco_relation(hist_t *hist)
 {
+	pred_t *pred = hist->pred, *last_pred = hist->pred + hist->pred_n;
+	// Store in tmp the union of qco in hist
+	co_t *tmp = NULL;
+	while (pred < last_pred) {
+		co_t *qco_b = g_hash_table_lookup(
+				pred->hist->e->qco, pred->hist);
+		if (tmp != NULL) {
+			qco_b = co_union(tmp, qco_b);
+			co_finalize(tmp);
+		}
+		tmp = qco_b;
+		pred++;
+	}
+	pred = hist->pred;
+	while (pred < last_pred) {
+		co_t *co_b = co_union(
+			g_hash_table_lookup(pred->hist->e->co, pred->hist),
+			g_hash_table_lookup(pred->cond->co_private, pred->hist)
+		);
+		co_t *co_qco_b = co_union(co_b,
+			g_hash_table_lookup(pred->hist->e->qco, pred->hist));
+		co_finalize(co_b);
+		co_intersect(co_qco_b, tmp);
+	}
+	co_drop_preset(tmp, hist->e);
+	return tmp;
 }
 
+/**
+ * Adds an history to the unfolding, then finds new possible estensions
+ */
 void add_history(hist_t *hist)
 {
 	event_t *e = hist->e;
@@ -203,6 +367,19 @@ void add_history(hist_t *hist)
 		nc_add_event(e);
 	}
 	g_hash_table_insert(e->hist, hist, hist);
+	
+	// Computes co and qco relations
+	co_t *co_rel = co_relation(hist),
+	    *qco_rel = qco_relation(hist);
+	
+	g_hash_table_insert(hist->e->co, hist, co_rel);
+	g_hash_table_insert(hist->e->qco, hist, qco_rel);
+	
+	// Adds the reverse direction of co
+	// TODO
+	
+	// Adds the marking of hist to the unfolding
+	g_hash_table_insert(hist->mark, hist->mark);
 }
 
 /*****************************************************************************/
