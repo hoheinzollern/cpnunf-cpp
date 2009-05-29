@@ -28,6 +28,7 @@ net_t* nc_create_net()
 unf_t* nc_create_unfolding()
 {
 	unf_t *unf = MYmalloc(sizeof(unf_t));
+	unf->markings = g_hash_table_new(NULL, NULL);
 	unf->conditions = g_hash_table_new(NULL, NULL);
 	unf->events = g_hash_table_new(NULL, NULL);
 	return unf;

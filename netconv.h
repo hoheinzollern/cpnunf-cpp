@@ -55,14 +55,19 @@ typedef struct hist_t {
 	int size;			// size of the history
 	struct event_t *e;		// last event in history
 	struct mark_t *mark;		// marking of the history
-	struct pred_t **pred;		// the predecessors
+	struct pred_t **pred;		// the predecessors, ordered by b
 } hist_t;
+
+#define HIST_R 0x01
+#define HIST_C 0x02
 
 /**
  * This structure is used to define the list of predecessors for H
  */
 typedef struct pred_t {
-	hist_t *hist;
+	uchar flag;		// marks the type of history chosen
+	struct cond_b *cond;
+	struct hist_t *hist;
 } pred_t;
 
 typedef struct cond_t
@@ -121,6 +126,7 @@ typedef struct
  */
 typedef struct
 {
+	GHashTable *markings;
 	GHashTable *conditions;	/* pointer to first condition		*/
 	GHashTable *events;	/* pointer to first event		*/
 	struct nodelist_t *m0;	/* list of minimal conditions		*/
