@@ -167,7 +167,7 @@ event_t *nc_event_new(trans_t *tr, GArray *pre, GArray *read)
 	// Adds a new condition for each place in the postset:
 	GArray *post = ev->postset = g_array_new(FALSE, FALSE,
 		sizeof(cond_t *));
-	// TODO: alternativa: g_array_sized_new con dimensione tr->postset_size
+	// TODO: alternatively: g_array_sized_new with size tr->postset_size
 	nodelist_t *ps = tr->postset;
 	while (ps) {
 		cond_t *cond = nc_cond_new(ps->node, ev);

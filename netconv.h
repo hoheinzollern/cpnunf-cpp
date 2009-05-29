@@ -129,9 +129,10 @@ typedef struct
 typedef struct
 {
 	GHashTable *markings;
-	GHashTable *conditions;	/* pointer to first condition		*/
-	GHashTable *events;	/* pointer to first event		*/
+	GHashTable *conditions;
+	GHashTable *events;
 	struct nodelist_t *m0;	/* list of minimal conditions		*/
+	event_t *root;		// root event, not part of the unfolding
 } unf_t;
 
 /****************************************************************************/

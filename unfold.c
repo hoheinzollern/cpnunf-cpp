@@ -257,6 +257,49 @@ co_t *co_union(co_t *a, co_t *b)
 }
 
 /**
+ * Inserts a pair <b, H> in a co_relation
+ * @arg co the co relation
+ * @arg cond the condition part of the pair
+ * @arg hist the history part of the pair
+ */
+void co_insert(co_t *co, cond_t *cond, hist_t *hist)
+{
+	co_cond_t *conds = co->conds;
+	int i = 0, len = co->len;
+	// Navy search of the place; TODO: consider binary search
+	while (i < len && conds[i].cond < cond)
+		i++;
+	if (i < len && conds[i].cond == cond) {
+		// cond is already found in the co_structure, so 
+		// just insert the history
+		int j = 0;
+		while (j < conds[i].hists_len && hist < conds[i].hists[j])
+			j++;
+		if (j >= conds[i].hists_len || hist != conds[i].hists[j]) {
+			// The history is not found, so add it to the array
+			hist_t **hists = MYmalloc(conds[i].hists_len+1);
+			memcpy(hists, conds[i].hists, sizeof(hist_t *) * j);
+			memcpy(hists + j + 1, conds[i].hists + j,
+				sizeof(hist_t *) * (conds[i].hists_len-j+1));
+			hists[j] = hist;
+			free(conds[i].hists);
+			conds[i].hists = hists;
+			conds[i].hists_len++;
+		}
+	} else {
+		// cond is not found, insert it in the co_structure
+		conds = MYmalloc(sizeof(co_cond_t *) * (len+1) );
+		memcpy(conds, co->conds, sizeof(co_cond_t *) * i);
+		memcpy(conds + i + 1, co->conds + i,
+			sizeof(co_cond_t *) * (len-i+1));
+		conds[i].cond = cond;
+		conds[i].hists_len = 1;
+		conds[i].hists = MYmalloc(sizeof(hist_t *));
+		conds[i].hists[0] = hist;
+	}
+}
+
+/**
  * Given an enriched event e, returns the pairs <b, H> in the postset of e
  * as a co structure.
  */
@@ -278,6 +321,7 @@ co_t *co_postset_e(hist_t *hist)
 /**
  * Computes the co-relation given an enriched event. See theory at section
  * "Keeping co and qco-relations" for details.
+ * Also updates the reverse side of the relation.
  */
 co_t *co_relation(hist_t *hist)
 {
@@ -317,8 +361,30 @@ co_t *co_relation(hist_t *hist)
 		pred++;
 	}
 	co_drop_preset(tmp, hist->e);
-	co_t *result = co_union(tmp, co_postset_e(hist));
+	co_t *co_post = co_postset_e(hist);
+	co_t *result = co_union(tmp, co_post);
 	co_finalize(tmp);
+	co_finalize(co_post);
+	
+	// Adds the reverse side of the relation:
+	GArray *post_e = hist->e->postset;
+	co_cond_t *co = result->conds, *last_co = result->conds + result->len;
+	for (; co < last_co; co++) {
+		hist_t **h = co->hists, **last_h = co->hists + co->hists_len;
+		for (; h < last_h; h++) {
+			co_t *co_b1 = g_hash_table_lookup(co->cond->co_private, *h);
+			if (co_b1 == NULL) {
+				co_b1 = co_new(0);
+				g_hash_table_insert(co->cond->co_private, *h, co_b1);
+			}
+			int i = 0;
+			for (; i < post_e->len; i++) {
+				cond_t *b = g_array_index(post_e, cond_t *, i);
+				co_insert(co_b1, b, hist);
+			}
+		}
+	}
+	
 	return result;
 }
 
@@ -375,11 +441,8 @@ void add_history(hist_t *hist)
 	g_hash_table_insert(hist->e->co, hist, co_rel);
 	g_hash_table_insert(hist->e->qco, hist, qco_rel);
 	
-	// Adds the reverse direction of co
-	// TODO
-	
 	// Adds the marking of hist to the unfolding
-	g_hash_table_insert(hist->mark, hist->mark);
+	g_hash_table_insert(unf->markings, hist->mark, hist->mark);
 }
 
 /*****************************************************************************/
