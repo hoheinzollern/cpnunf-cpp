@@ -10,62 +10,15 @@
  */
 
 #define PE_ALLOC_STEP 1024
-pe_queue_t **pe_queue;		/* the priority array */
+hist_t **pe_queue;		/* the priority array */
 int pe_qsize, pe_qalloc;	/* current/maximum capacity */
-
-/**
- * This structure (a list of node lists) is used during the search for
- * possible extensions to enumerate all potential sets conditions for a
- * given transition.
- */
-typedef struct pe_comb_t
-{
-	nodelist_t *current;
-	nodelist_t *start;
-} pe_comb_t;
-
-pe_comb_t *pe_combs;	/* used in pe() */
-cond_t   **pe_conds;	/* array of conditions, given by pe() to pe_insert() */
-uchar     *pe0_conflicts;	/* conflicts of the initial conditions */
-
-/**
- * Simple functions: initialize queue, release a queue entry, and release
- * memory allocated during initialization.
- */
-void pe_init (nodelist_t *m0)
-{
-	int i;
-
-	pe_qsize = 0;
-	pe_queue = MYmalloc((pe_qalloc = PE_ALLOC_STEP) * sizeof(pe_queue_t*));
-	
-	pe_conds = MYmalloc(net->maxpre * sizeof(place_t*));
-	pe_combs = MYmalloc(net->maxpre * sizeof(pe_comb_t));
-
-	/* determine size of initial marking */
-	for (i = 0; m0; m0 = m0->next) i++;
-	pe0_conflicts = MYcalloc((i + 8) / 8);
-}
-
-void pe_free (pe_queue_t *qu)
-{
-	free(qu->conds);
-	free(qu);
-}
-
-void pe_finish ()
-{
-	free(pe_conds);
-	free(pe0_conflicts);
-	free(pe_combs);
-}
 
 /**
  * Adds the possible extension (tr,pe_conds) to the priority queue.
  */
 void pe_insert (hist_t *h)
 {
-	pe_queue_t *qu_new = create_queue_entry(tr);
+	hist_t *qu_new = create_queue_entry(tr);
 	int index = ++pe_qsize;
 
 	if (pe_qsize >= pe_qalloc)

@@ -321,7 +321,9 @@ co_t *co_postset_e(hist_t *hist)
 /**
  * Computes the co-relation given an enriched event. See theory at section
  * "Keeping co and qco-relations" for details.
- * Also updates the reverse side of the relation.
+ * Also updates the reverse side of the relation for each condition inserted.
+ * @arg hist the enriched event just inserted
+ * @return the co-relation for the event
  */
 co_t *co_relation(hist_t *hist)
 {
@@ -332,7 +334,7 @@ co_t *co_relation(hist_t *hist)
 			co_t *co_b = co_union(
 				(co_t*)g_hash_table_lookup(
 					pred->cond->co_private, pred->hist),
-	 			(co_t*)g_hash_table_lookup(
+				(co_t*)g_hash_table_lookup(
 					pred->hist->e->co, pred->hist)
 			);
 			if (tmp)
@@ -372,10 +374,12 @@ co_t *co_relation(hist_t *hist)
 	for (; co < last_co; co++) {
 		hist_t **h = co->hists, **last_h = co->hists + co->hists_len;
 		for (; h < last_h; h++) {
-			co_t *co_b1 = g_hash_table_lookup(co->cond->co_private, *h);
+			co_t *co_b1 = g_hash_table_lookup(co->cond->co_private,
+							   *h);
 			if (co_b1 == NULL) {
 				co_b1 = co_new(0);
-				g_hash_table_insert(co->cond->co_private, *h, co_b1);
+				g_hash_table_insert(co->cond->co_private, *h,
+						     co_b1);
 			}
 			int i = 0;
 			for (; i < post_e->len; i++) {
@@ -452,4 +456,5 @@ void add_history(hist_t *hist)
  */
 void unfold ()
 {
+	
 }

@@ -24,26 +24,57 @@ typedef struct nodelist_t
  * reverse_list() depends on it.
  */
 
+/**
+ * This structure represents a place in the original c-net
+ */
 typedef struct place_t
 {
+	/// Pointer to the next place in the list of places
 	struct place_t *next;
-	char  *name;			// short name
-	int    num;			// number
-	nodelist_t *preset;	// unordered list of preset
-	nodelist_t *postset;	// unordered list of postset
-	nodelist_t *readarcs;	// read arcs (unordered)
-	nodelist_t *conds;	// conditions derived from this place
-	char marked;		 	// non-zero if place is marked
+	
+	/// Short name for the place
+	char  *name;
+	
+	/// Number
+	unsigned short int    num;
+	
+	/// unordered list of preset
+	nodelist_t *preset;
+	
+	/// unordered list of postset
+	nodelist_t *postset;
+	
+	/// read arcs (unordered)
+	nodelist_t *readarcs;
+	
+	/// conditions derived from this place
+	nodelist_t *conds;
+	
+	/// non-zero if place is marked
+	char marked;
 } place_t;
 
 typedef struct trans_t
 {
+	/// Pointer to the next event in the list of events
 	struct trans_t *next;
-	char  *name;			// short name
-	int    num;			// number
-	nodelist_t *preset;	// ordered array of preset
-	nodelist_t *postset;	// ordered array of postset
-	nodelist_t *readarcs;	// read arcs (ordered)
+	
+	/// Short name for the event
+	char  *name;
+	
+	/// Number
+	unsigned short int    num;
+	
+	/// unordered list of preset
+	nodelist_t *preset;
+	
+	/// unordered list of postset
+	nodelist_t *postset;
+	
+	/// read arcs (unordered)
+	nodelist_t *readarcs;
+	
+	/// Size of preset, postset and read arcs
 	short  preset_size, postset_size, readarc_size;
 } trans_t;
 
@@ -52,11 +83,20 @@ typedef struct trans_t
  * note that such definition for an history is equivalent to an enriched event.
  */
 typedef struct hist_t {
-	int size;			// size of the history
-	struct event_t *e;		// last event in history
-	struct mark_t *mark;		// marking of the history
-	struct pred_t *pred;		// the predecessors, ordered by b
-	int pred_n;			// the number of predecessors
+	/// size of the history
+	int size;
+	
+	/// last event in history
+	struct event_t *e;
+	
+	/// marking of the history
+	struct mark_t *mark;
+	
+	/// the predecessors, ordered by b
+	struct pred_t *pred;
+	
+	/// the number of predecessors
+	int pred_n;
 } hist_t;
 
 #define HAS_FLAG(flags, flag) ((flags) & (flag) != 0)
@@ -67,33 +107,76 @@ typedef struct hist_t {
  * This structure is used to define the list of predecessors for H
  */
 typedef struct pred_t {
-	uchar flags;		// marks the type of history chosen
+	/// marks the type of history chosen
+	uchar flags;
+	
+	/// condition form which the history was chosen
 	struct cond_t *cond;
+	
+	/// the chosen history
 	struct hist_t *hist;
 } pred_t;
 
+/**
+ * Defines a condition in the unfolding
+ */
 typedef struct cond_t
 {
-	struct event_t *pre_ev;		// the single event in the preset
-	GArray *postset;		// ordered array of postset
-	GArray *readarcs;	// read arcs (ordered)
-	place_t *origin;		// associated place
-	int num;			// number (needed by co_relation)
-	int mark;			// used by marking_of
-	GHashTable *co_private;		// array of co-conditions
+	/// the single event in the preset
+	struct event_t *pre_ev;
+	
+	/// ordered array of postset
+	GArray *postset;
+	
+	/// read arcs (ordered)
+	GArray *readarcs;
+	
+	/// associated place
+	place_t *origin;
+	
+	/// number (needed by co_relation)
+	int num;
+	
+	/// used by marking_of
+	int mark;
+	
+	/// array of co-conditions
+	GHashTable *co_private;
 } cond_t;
 
+/**
+ * Defines an event in the unfolding
+ */
 typedef struct event_t
 {
-	GArray *preset;		// array of preset/postset conditions
-	GArray *postset;		// size fixed by sizes of origin
-	GArray *readarcs;	// read arcs (ordered)
-	trans_t *origin;		// associated transition
+	/// array of preset/postset conditions
+	GArray *preset;
+	
+	/// size fixed by sizes of origin
+	GArray *postset;
+	
+	/// read arcs (ordered)
+	GArray *readarcs;
+	
+	/// associated transition
+	trans_t *origin;
+	
+	/// number (needed by co_relation)
 	int num;
-	int mark;			// used by marking_of
+	
+	/// used by marking_of
+	int mark;
+	
+	/// hash table indexed on the histories for the co-relation
 	GHashTable   *co;
+	
+	/// hash table indexed on the histories for the qco-relation
 	GHashTable   *qco;
+	
+	/// Foata level for the event
 	short  foata_level;
+	
+	/// hash table of the histories associated to this event
 	GHashTable *hist;
 } event_t;
 
@@ -101,13 +184,21 @@ typedef struct event_t
  * Co-array structure, also used for qco-relation.
  */
 typedef struct co_cond_t {
-	cond_t *cond;		// condition in co-array
+	/// condition in co-array
+	cond_t *cond;
+	
+	/// length of the hists array
 	int hists_len;
-	hist_t **hists;		// array of concurrent histories
+	
+	/// array of histories concurrent to cond
+	hist_t **hists;
 } co_cond_t;
 
 typedef struct co_t {
+	/// number of concurrent conditions
 	int len;
+	
+	/// pointer to the first condition
 	struct co_cond_t *conds;
 } co_t;
 
