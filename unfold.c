@@ -146,7 +146,7 @@ void co_drop_preset(co_t *co, event_t *ev)
 {
 	co_cond_t *cond1 = co->conds, *cond2 = co->conds,
 		*lastcond = co->conds + co->len;
-	GArray *pre = ev->preset;
+	array_t *pre = ev->preset;
 	int i = 0;
 	
 	while (i < pre->len && cond2 < lastcond) {
@@ -305,7 +305,7 @@ void co_insert(co_t *co, cond_t *cond, hist_t *hist)
  */
 co_t *co_postset_e(hist_t *hist)
 {
-	GArray *post = hist->e->postset;
+	array_t *post = hist->e->postset;
 	co_t *co = co_new(post->len);
 	co_cond_t *cond = co->conds, *last_cond = co->conds + co->len;
 	int i = 0;
@@ -369,7 +369,7 @@ co_t *co_relation(hist_t *hist)
 	co_finalize(co_post);
 	
 	// Adds the reverse side of the relation:
-	GArray *post_e = hist->e->postset;
+	array_t *post_e = hist->e->postset;
 	co_cond_t *co = result->conds, *last_co = result->conds + result->len;
 	for (; co < last_co; co++) {
 		hist_t **h = co->hists, **last_h = co->hists + co->hists_len;
@@ -446,7 +446,7 @@ void add_history(hist_t *hist)
 	g_hash_table_insert(hist->e->qco, hist, qco_rel);
 	
 	// Adds the marking of hist to the unfolding
-	g_hash_table_insert(unf->markings, hist->mark, hist->mark);
+	g_hash_table_insert(unf->markings, hist->parikh, hist->parikh);
 }
 
 /*****************************************************************************/

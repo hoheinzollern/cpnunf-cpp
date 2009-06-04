@@ -34,11 +34,11 @@ unf_t* nc_create_unfolding()
 	return unf;
 }
 
-/****************************************************************************/
-/* nc_create_{place,transition}						    */
-/* Creates a new place or transition in the given net. The new node has no  */
-/* incoming or outgoing arcs and is unmarked.				    */
-
+/**
+ * nc_create_place
+ * Creates a new place in the given net. The new node has no
+ * incoming or outgoing arcs.
+ */
 place_t* nc_create_place (net_t *net)
 {
 	place_t *pl = MYmalloc(sizeof(place_t));
@@ -49,6 +49,11 @@ place_t* nc_create_place (net_t *net)
 	return pl;
 }
 
+/**
+ * nc_create_transition
+ * Creates a new transition in the given net. The new node has no
+ * incoming or outgoing arcs and is unmarked.
+ */
 trans_t* nc_create_transition (net_t *net)
 {
 	trans_t *tr = MYmalloc(sizeof(trans_t));
@@ -60,10 +65,10 @@ trans_t* nc_create_transition (net_t *net)
 	return tr;
 }
 
-/****************************************************************************/
-/* nc_create_arc							    */
-/* Create an arc between two nodes (place->transition or transition->place) */
-
+/**
+ * nc_create_arc
+ * Create an arc between two nodes (place->transition or transition->place)
+ */
 void nc_create_arc (nodelist_t **fromlist, nodelist_t **tolist,
 		   void *from, void *to)
 {
@@ -76,10 +81,10 @@ void nc_create_arc (nodelist_t **fromlist, nodelist_t **tolist,
 	nodelist_push(tolist,from);
 }
 
-/****************************************************************************/
-/* nc_compute_sizes							    */
-/* compute (maximal) sizes of transition presets/postsets		    */
-
+/**
+ * nc_compute_sizes
+ * compute (maximal) sizes of transition presets/postsets
+ */
 void nc_compute_sizes (net_t *net)
 {
 	trans_t *tr;
@@ -135,6 +140,9 @@ gint nc_compare(gconstpointer a, gconstpointer b)
 
 /**
  * Creates a new condition given a place and it's pre-event
+ * @arg pl the image for the condition in the original net_t
+ * @arg ev the single event in the preset of the condition
+ * @return the newly created condition
  */
 cond_t *nc_cond_new(place_t *pl, event_t *ev)
 {
@@ -144,8 +152,8 @@ cond_t *nc_cond_new(place_t *pl, event_t *ev)
 	cond->pre_ev = ev;
 	cond->origin = pl;
 	
-	cond->postset = g_array_new(FALSE, TRUE, sizeof(event_t *));
-	cond->readarcs = g_array_new(FALSE, TRUE, sizeof(event_t *));
+	cond->postset = array_new(10);
+	cond->readarcs = array_new(10);
 	
 	cond->co_private = g_hash_table_new(NULL, NULL);
 	
@@ -155,7 +163,7 @@ cond_t *nc_cond_new(place_t *pl, event_t *ev)
 /**
  * Creates an event for the unfolding
  */
-event_t *nc_event_new(trans_t *tr, GArray *pre, GArray *read)
+event_t *nc_event_new(trans_t *tr, array_t *pre, array_t *read)
 {
 	event_t *ev = (event_t*)MYmalloc(sizeof(event_t));
 	ev->num = event_last++;
@@ -165,16 +173,14 @@ event_t *nc_event_new(trans_t *tr, GArray *pre, GArray *read)
 	ev->readarcs = read;
 	
 	// Adds a new condition for each place in the postset:
-	GArray *post = ev->postset = g_array_new(FALSE, FALSE,
-		sizeof(cond_t *));
-	// TODO: alternatively: g_array_sized_new with size tr->postset_size
+	array_t *post = ev->postset = array_new(tr->postset_size);
 	nodelist_t *ps = tr->postset;
 	while (ps) {
 		cond_t *cond = nc_cond_new(ps->node, ev);
-		g_array_append_val(post, cond);
+		array_append(post, cond);
 		ps = ps->next;
 	}
-	g_array_sort(post, nc_compare);
+	array_sort(post);
 	
 	ev->co = g_hash_table_new(NULL, NULL);
 	ev->qco = g_hash_table_new(NULL, NULL);
@@ -192,7 +198,7 @@ void nc_add_event(event_t *ev)
 	int size = ev->postset->len, i;
 	for (i=0; i<size; i++)
 	{
-		cond_t *cond = g_array_index(ev->postset, cond_t *, i);
+		cond_t *cond = array_get(ev->postset, i);
 		g_hash_table_insert(unf->events, cond, cond);
 	}
 }

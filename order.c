@@ -5,105 +5,95 @@
 #include "netconv.h"
 #include "unfold.h"
 
-/*****************************************************************************/
-
-parikh_t *parikh;
-parikh_t *pa_last;
-
-int parikh_count;	/* counts the total number of elements in the vector */
-int parikh_size;	/* counts the number of different transitions        */
-
-/*****************************************************************************/
-
-void parikh_init ()
+/**
+ * Creates a new parikh vector
+ */
+parikh_vec_t *parikh_new ()
 {
+	parikh_vec_t *vec = MYmalloc(sizeof(parikh_vec_t));
 	if (net->numtr > 0xFFFE)
 	{
-		fprintf(stderr,"Parikh vector has too few entries.\n");
+		fprintf(stderr, "Parikh vector has too few entries.\n");
 		exit(1);
 	}
-	parikh = MYmalloc((net->numtr + 2) * sizeof(parikh_t));
+	vec->last = vec->parikh = MYmalloc(net->numtr * sizeof(parikh_t));
+	vec->size = net->numtr;
+	vec->count = 0;
 }
 
-void parikh_finish ()
+/**
+ * Finalizes a parikh vector
+ */
+void parikh_finish (parikh_vec_t *vec)
 {
-	free(parikh);
+	free(vec->parikh);
+	free(vec);
 }
 
-/*****************************************************************************/
-/* Set the Parikh vector to empty.					     */
-
-void parikh_reset ()
+/**
+ * Set the Parikh vector to empty.
+ */
+void parikh_reset (parikh_vec_t *vec)
 {
-	/* The entries 0 and 1 serve as boundary elements. */
-	parikh[0].tr_num = 0;
-	parikh[1].tr_num = 0;
-
-	parikh_count = 0;
-	parikh_size = 0;
-
-	/* Assuming that causally related events are due to transitions
-	   whose numbers are near to each other, we start searching for
-	   additional transitions near the last insertion.		*/
-	pa_last = parikh + 1;
+	vec->count = 0;
 }
 
-/*****************************************************************************/
-/* Add an appearance of transition number tr_num.			     */
-
-void parikh_add (int tr_num)
+/**
+ * Add an appearance of transition number tr_num.
+ */
+void parikh_add (parikh_vec_t *vec, unsigned short int tr_num)
 {
-	parikh_count++;
-	if (tr_num < pa_last->tr_num)
+	vec->count++;
+	if (tr_num < vec->last->tr_num)
 	{	/* smaller than last insertion - search downwards */
-		if (tr_num < parikh[1].tr_num)
-			pa_last = parikh + 1;
+		if (tr_num < vec->max)
+			vec->last = vec->parikh + 1;
 		else	
 		{
-			while (tr_num < (--pa_last)->tr_num);
-			if (tr_num == pa_last->tr_num) goto parikh_add;
-			else pa_last++;
+			while (tr_num < (--vec->last)->tr_num);
+			if (tr_num == vec->last->tr_num) goto parikh_add;
+			else vec->last++;
 		}
 	}
-	else if (tr_num > pa_last->tr_num)
+	else if (tr_num > vec->last->tr_num)
 	{	/* larger than last insertion - search upwards */
-		if (tr_num > parikh[parikh_size].tr_num)
-			pa_last = parikh + parikh_size + 1;
+		if (tr_num > vec->parikh[vec->size].tr_num)
+			vec->last = vec->parikh + vec->size + 1;
 		else	
 		{
-			while (tr_num > (++pa_last)->tr_num);
-			if (tr_num == pa_last->tr_num) goto parikh_add;
+			while (tr_num > (++vec->last)->tr_num);
+			if (tr_num == vec->last->tr_num) goto parikh_add;
 		}
 	}
 	else
 		goto parikh_add;
 
-	/* insert one appearance of tr_num at pa_last */
-	memmove(pa_last+1, pa_last, sizeof(parikh_t)
-		* (2 + parikh_size - (pa_last - parikh)));
-	pa_last->tr_num = tr_num;
-	pa_last->appearances = 1;
-	parikh_size++;
+	/* insert one appearance of tr_num at vec->last */
+	memmove(vec->last+1, vec->last, sizeof(parikh_t)
+		* (vec->size - (vec->last - vec->parikh)));
+	vec->last->tr_num = tr_num;
+	vec->last->appearances = 1;
+	vec->size++;
 	return;
 
-	parikh_add: pa_last->appearances++;
+	parikh_add: vec->last->appearances++;
 }
 
-/*****************************************************************************/
-/* Finish vector and return a copy.					     */
-
-parikh_t* parikh_save ()
+/**
+ * Finish vector
+ */
+void parikh_save (parikh_vec_t *vec)
 {
-	parikh_t *vector = MYmalloc(++parikh_size * sizeof(parikh_t));
-	parikh[parikh_size].tr_num = 0; /* mark the last array element */
-	memcpy(vector, parikh+1, parikh_size * sizeof(parikh_t));
-	return vector;
+	parikh_t *vector = MYmalloc(++vec->size * sizeof(parikh_t));
+	vec->parikh[vec->size].tr_num = 0; /* mark the last array element */
+	memcpy(vector, vec->parikh, vec->size * sizeof(parikh_t));
+	vec->parikh = vector;
 }
 
-/*****************************************************************************/
-/* Compares two Parikh vectors pe1 and pe2.				     */
-/* Returns -1 if pe1 < pe2, and 1 if pe1 > pe2, 0 if pe1 == pe2.	     */ 
-
+/**
+ * Compares two Parikh vectors pe1 and pe2.
+ * Returns -1 if pe1 < pe2, and 1 if pe1 > pe2, 0 if pe1 == pe2.
+ */ 
 int parikh_compare (parikh_t *pv1, parikh_t *pv2)
 {
 	while (pv1->tr_num && pv2->tr_num && (pv1->tr_num == pv2->tr_num)
@@ -117,12 +107,51 @@ int parikh_compare (parikh_t *pv1, parikh_t *pv2)
 		return pv1->tr_num - pv2->tr_num;
 }
 
-/*****************************************************************************/
-/* Computes ordering information for the possible extension e=(tr,pe_conds)  */
-/* and returns a queue entry with that information. The ordering information */
-/* consists of the size and Parikh vector of [e]; the Foata normal form is   */
-/* computed only when necessary.					     */
+int size_mark_rec(hist_t *hist, parikh_vec_t *vec)
+{
+	if (!HAS_FLAG(hist->flags, BLACK)) {
+		SET_FLAG(hist->flags, BLACK);
+		parikh_add(vec, hist->e->origin->num);
+		int size = 1;
 
+		pred_t *pred = hist->pred, *last = hist->pred + hist->pred_n;
+		while (pred < last) {
+			size += size_mark_rec(pred->hist, vec);
+			pred++;
+		}
+		return size;
+	} else
+		return 0;
+}
+
+void size_mark_clean(hist_t *hist)
+{
+	if (HAS_FLAG(hist->flags, BLACK)) {
+		CLEAN_FLAG(hist->flags, BLACK);
+
+		pred_t *pred = hist->pred, *last = hist->pred + hist->pred_n;
+		while (pred < last) {
+			size_mark_clean(pred->hist);
+			pred++;
+		}
+	}
+}
+
+void size_mark(hist_t *hist)
+{
+	parikh_vec_t *vec = parikh_new();
+	int size = size_mark_rec(hist, vec);
+	size_mark_clean(hist);
+	hist->size = size;
+	hist->parikh = vec;
+}
+
+/**
+ * Computes ordering information for the possible extension e=(tr,pe_conds)
+ * and returns a queue entry with that information. The ordering information
+ * consists of the size and Parikh vector of [e]; the Foata normal form is
+ * computed only when necessary.
+ *
 pe_queue_t* create_queue_entry (trans_t *tr)
 {
 	pe_queue_t *qu_new;
@@ -137,7 +166,7 @@ pe_queue_t* create_queue_entry (trans_t *tr)
 	parikh_reset();
 	parikh_add(tr->num);
 
-	/* add the input events of the pre-conditions into the queue */
+	// add the input events of the pre-conditions into the queue 
 	for (sz = tr->preset_size, co_ptr = pe_conds; sz--; )
 	{
 		(co = *co_ptr++)->mark = ev_mark;
@@ -150,7 +179,7 @@ pe_queue_t* create_queue_entry (trans_t *tr)
 		queue--;
 		parikh_add(ev->origin->num);
 
-		/* add the immediate predecessor events of ev to the queue */
+		// add the immediate predecessor events of ev to the queue
 		for (sz = ev->origin->preset_size, co_ptr = ev->preset; sz--; )
 		{
 			(co = *co_ptr++)->mark = ev_mark;
@@ -159,19 +188,19 @@ pe_queue_t* create_queue_entry (trans_t *tr)
 		}
 	}
 
-	/* create the queue element */
+	// create the queue element
         qu_new = MYmalloc(sizeof(pe_queue_t));
         qu_new->trans = tr;
 
-        /* copy the pre-conditions */
+        // copy the pre-conditions
         qu_new->conds = MYmalloc(tr->preset_size * sizeof(cond_t*));
         memcpy(qu_new->conds,pe_conds,tr->preset_size*sizeof(cond_t*));
 
-	/* copy Parikh vector */
+	// copy Parikh vector
 	qu_new->p_vector = parikh_save();
 	qu_new->lc_size = parikh_count;
 
-	/* now compute the marking */
+	// now compute the marking
 	ev_mark++;
 	*(queue = events) = NULL;
 	qu_new->marking = NULL;
@@ -184,32 +213,33 @@ pe_queue_t* create_queue_entry (trans_t *tr)
 	{
 		queue--;
 
-		/* check off the postset conditions */
+		// check off the postset conditions
 		for (sz = ev->origin->postset_size, co_ptr = ev->postset; sz--;)
 			if ((co = *co_ptr++)->mark != ev_mark-1)
 				nodelist_insert(&(qu_new->marking),co->origin);
 
-		/* add the immediate predecessor events of ev to the queue */
+		// add the immediate predecessor events of ev to the queue
 		for (sz = ev->origin->preset_size, co_ptr = ev->preset; sz--; )
 			if ((ev = (*co_ptr++)->pre_ev) && ev->mark != ev_mark)
 				(*++queue = ev)->mark = ev_mark;
 	}
 
-	/* add the post-places of tr */
+	// add the post-places of tr 
 	for (list = tr->postset; list; list = list->next)
 		nodelist_insert(&(qu_new->marking), list->node);
 
-	/* add the places of unconsumed minimal conditions */
+	// add the places of unconsumed minimal conditions
 	for (list = unf->m0; list; list = list->next)
 		if ((co = list->node)->mark != ev_mark-1)
 			nodelist_insert(&(qu_new->marking), co->origin);
 
 	return qu_new;
 }
+*/
 
-/*****************************************************************************/
-/* Determine the Foata level of a possible extension.			     */
-
+/**
+ * Determine the Foata level of a possible extension.
+ *
 int find_foata_level (pe_queue_t *pe)
 {
 	int level = 1;
@@ -224,12 +254,12 @@ int find_foata_level (pe_queue_t *pe)
 	}
 
 	return level;
-}
+}*/
 
-/*****************************************************************************/
-/* Identify the "slices" of the Foata normal form in the local configuration */
-/* of the possible extension pe.					     */
-
+/**
+ * Identify the "slices" of the Foata normal form in the local configuration
+ * of the possible extension pe.
+ *
 nodelist_t** create_foata_lists (pe_queue_t *pe)
 {
 	int sz, tr_level = find_foata_level(pe);
@@ -258,20 +288,21 @@ nodelist_t** create_foata_lists (pe_queue_t *pe)
 
 	return fo;
 }
-			
-/*****************************************************************************/
-/* Compare the Foata normal form of two local configurations.		     */
+*/
 
+/**
+ * Compare the Foata normal form of two local configurations.
+ *
 int foata_compare (pe_queue_t *pe1, pe_queue_t *pe2)
 {
-	/* create the Foata "slices" for both configurations */
+	// create the Foata "slices" for both configurations
 	nodelist_t **fo1 = create_foata_lists(pe1);
 	nodelist_t **fo2 = create_foata_lists(pe2);
 	nodelist_t **f1 = fo1+1, **f2 = fo2+1, *list;
 	parikh_t *pv1;
 	int res = 0, pc1;
 
-	while (*f1 && *f2)	/* compare Parikh vectors, level by level */
+	while (*f1 && *f2)	// compare Parikh vectors, level by level
 	{
 		parikh_reset();
 		for (list = *f1; list; list = list->next)
@@ -296,25 +327,27 @@ int foata_compare (pe_queue_t *pe1, pe_queue_t *pe2)
 	free(fo1);
 	free(fo2);
 
-	return res;	/* should never return 0 */
+	return res;	// should never return 0
 }
+*/
 
-/*****************************************************************************/
-/* Compares two possible extensions according to the <_E order from [ERV02]. */
-/* Returns -1 if pe1 < pe2, and 1 if pe1 > pe2, 0 otherwise (can't happen?). */
-
+/**
+ * Compares two possible extensions according to the <_E order from [ERV02].
+ * Returns -1 if pe1 < pe2, and 1 if pe1 > pe2, 0 otherwise (can't happen?).
+ *
 int pe_compare (pe_queue_t *pe1, pe_queue_t *pe2)
 {
 	int res;
 
-	/* Try to decide by local configuration size first. */
+	// Try to decide by local configuration size first.
 	if (pe1->lc_size < pe2->lc_size) return -1;
 	if (pe1->lc_size > pe2->lc_size) return 1;
 
-	/* Then decide by comparing the Parikh vectors. */
+	// Then decide by comparing the Parikh vectors.
 	if ((res = parikh_compare(pe1->p_vector,pe2->p_vector)))
 		return res;
 
-	/* Finally, decide by Foata normal form. */
+	// Finally, decide by Foata normal form.
 	return foata_compare(pe1,pe2);
 }
+*/

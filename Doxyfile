@@ -94,7 +94,7 @@ WARN_LOGFILE           =
 #---------------------------------------------------------------------------
 # configuration options related to the input files
 #---------------------------------------------------------------------------
-INPUT                  = /home/alessandro/Documents/Tesi/mora-070321
+INPUT                  = /home/alessandro/Documents/Tesi/unfolder
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.c \
                          *.cc \

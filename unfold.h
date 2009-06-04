@@ -9,6 +9,7 @@
 
 #include <stdlib.h>
 #include "netconv.h"
+#include "order.h"
 
 /****************************************************************************/
 /* declarations from unfold.c						    */
@@ -26,16 +27,10 @@ extern trans_t *stoptr;		/* the transition mentioned by the -T switch */
 extern nodelist_t *cutoff_list, *corr_list;  /* cut-off/corresponding list */
 extern nodelist_t *c_cutoffs;	/* cutoff list for c_unf */
 
+extern co_t *co_new(int size);
+extern co_t *co_copy(co_t *orig);
+extern void co_finalize(co_t *co);
+
 extern void unfold();	/* the unfolding procedure */
-
-
-/***************************************************************************/
-/* declarations for order.c						   */
-
-typedef struct parikh_t
-{
-	unsigned short int tr_num;
-	unsigned short int appearances;
-} parikh_t;
 
 #endif

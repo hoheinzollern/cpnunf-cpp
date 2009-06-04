@@ -8,8 +8,20 @@
 #define __NETCONV_H__
 
 #include <glib.h>
+#include "common.h"
 
 #define COARRAY_TYPE void
+
+#define HAS_FLAG(flags, flag) ((flags) & (flag) == (flag))
+
+#define SET_FLAG(flags, flag) ((flags) = (flags) & ~(flag) | (flag))
+
+#define CLEAN_FLAG(flags, flag) ((flags) = (flags) & ~(flag))
+
+#define HIST_R 0x01
+#define HIST_C 0x02
+
+#define BLACK 0x01
 
 typedef unsigned char uchar;
 
@@ -36,7 +48,7 @@ typedef struct place_t
 	char  *name;
 	
 	/// Number
-	unsigned short int    num;
+	unsigned short int num;
 	
 	/// unordered list of preset
 	nodelist_t *preset;
@@ -63,7 +75,7 @@ typedef struct trans_t
 	char  *name;
 	
 	/// Number
-	unsigned short int    num;
+	unsigned short int num;
 	
 	/// unordered list of preset
 	nodelist_t *preset;
@@ -90,25 +102,23 @@ typedef struct hist_t {
 	struct event_t *e;
 	
 	/// marking of the history
-	struct mark_t *mark;
+	struct parikh_vec_t *parikh;
 	
 	/// the predecessors, ordered by b
 	struct pred_t *pred;
 	
 	/// the number of predecessors
 	int pred_n;
+	
+	unsigned char flags;
 } hist_t;
-
-#define HAS_FLAG(flags, flag) ((flags) & (flag) != 0)
-#define HIST_R 0x01
-#define HIST_C 0x02
 
 /**
  * This structure is used to define the list of predecessors for H
  */
 typedef struct pred_t {
 	/// marks the type of history chosen
-	uchar flags;
+	unsigned char flags;
 	
 	/// condition form which the history was chosen
 	struct cond_t *cond;
@@ -126,10 +136,10 @@ typedef struct cond_t
 	struct event_t *pre_ev;
 	
 	/// ordered array of postset
-	GArray *postset;
+	array_t *postset;
 	
 	/// read arcs (ordered)
-	GArray *readarcs;
+	array_t *readarcs;
 	
 	/// associated place
 	place_t *origin;
@@ -150,13 +160,13 @@ typedef struct cond_t
 typedef struct event_t
 {
 	/// array of preset/postset conditions
-	GArray *preset;
+	array_t *preset;
 	
 	/// size fixed by sizes of origin
-	GArray *postset;
+	array_t *postset;
 	
 	/// read arcs (ordered)
-	GArray *readarcs;
+	array_t *readarcs;
 	
 	/// associated transition
 	trans_t *origin;
@@ -205,7 +215,7 @@ typedef struct co_t {
 /**
  * net_t: this structure represents the net
  */
-typedef struct
+typedef struct net_t
 {
 	place_t *places;	/* pointer to first place		*/
 	trans_t *transitions;	/* pointer to first transition		*/ 
@@ -217,7 +227,7 @@ typedef struct
 /**
  * unf_t: this structure represents the unfolding
  */
-typedef struct
+typedef struct unf_t
 {
 	GHashTable *markings;
 	GHashTable *conditions;

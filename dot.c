@@ -20,6 +20,11 @@ void* reverse_list (void *ptr)
 	return newlist;
 }
 
+void print_event(event_t *evt)
+{
+	printf("  e%d [shape=box]\n");
+}
+
 void write_dot_output (unf_t *u, nodelist_t *cutoffs, char compressed)
 {
 	cond_t *co;
@@ -28,9 +33,6 @@ void write_dot_output (unf_t *u, nodelist_t *cutoffs, char compressed)
 	nodelist_t *list, *list2;
 
 	int i, ev_num = 0;
-
-	u->conditions = reverse_list(u->conditions);
-	u->events = reverse_list(u->events);
 
 	for (ev = u->events; ev; ev = ev->next)
 		ev->mark = ++ev_num;

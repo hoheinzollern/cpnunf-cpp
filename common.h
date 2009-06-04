@@ -8,6 +8,7 @@
 #define __COMMON_H__
 
 #include <stdlib.h>
+#include "array.h"
 
 #define PROGRAM_NAME "unfold"
 

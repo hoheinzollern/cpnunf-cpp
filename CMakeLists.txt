@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.6)
 
 project(unfolder)
 
-FIND_PATH( GTK_glibconfig_INCLUDE_PATH NAMES glibconfig.h
+find_path( GTK_glibconfig_INCLUDE_PATH NAMES glibconfig.h
 	PATHS
 		/usr/openwin/share/include
 		/usr/local/include/glib12
@@ -13,7 +13,7 @@ FIND_PATH( GTK_glibconfig_INCLUDE_PATH NAMES glibconfig.h
 		/opt/gnome/lib/glib/include
 )
 
-FIND_PATH( GTK_glib_INCLUDE_PATH NAMES glib.h
+find_path( GTK_glib_INCLUDE_PATH NAMES glib.h
 	PATH_SUFFIXES gtk-1.2 glib-1.2 glib12
 	PATHS
 		/usr/openwin/share/include
@@ -21,7 +21,7 @@ FIND_PATH( GTK_glib_INCLUDE_PATH NAMES glib.h
 		/opt/gnome/include
 )
 
-FIND_LIBRARY( GTK_glib_LIBRARY
+find_library( GTK_glib_LIBRARY
 	NAMES  glib glib12
 	PATHS  /usr/openwin/lib
 		/opt/gnome/lib
@@ -29,6 +29,7 @@ FIND_LIBRARY( GTK_glib_LIBRARY
 
 include_directories(${GTK_glibconfig_INCLUDE_PATH} ${GTK_glib_INCLUDE_PATH})
 
-add_executable(unfolder common.c main.c marking.c netconv.c nodelist.c readlib.c readpep.c unfold.c)
+add_executable(unfolder common.c main.c marking.c netconv.c nodelist.c readlib.c
+	readpep.c unfold.c order.c dot.c array.c)
 
 target_link_libraries(unfolder ${GTK_glib_LIBRARY})
