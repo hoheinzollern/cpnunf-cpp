@@ -1,5 +1,6 @@
 #include "common.h"
 #include "unfold.h"
+#include <string.h>
 
 /*****************************************************************************/
 
@@ -101,12 +102,12 @@ array_t *place_postset(array_t *S)
 	for (i = 0; i < S->len; i++) {
 		nodelist_t *post = ((place_t *)array_get(S, i))->postset;
 		while (post != NULL) {
-			array_insert(T, post->node);
+			array_insert_ordered(T, post->node);
 			post = post->next;
 		}
 		nodelist_t *cont = ((place_t *)array_get(S, i))->readarcs;
 		while (cont != NULL) {
-			array_insert(T, cont->node);
+			array_insert_ordered(T, cont->node);
 			cont = cont->next;
 		}
 	}
@@ -120,17 +121,58 @@ inline place_t *place(co_cond_t *co_cond)
 /**
  * Test whether *tr U _tr_ in co and returns the set of conditions that need to
  * be pairwise concurrent to create a new history for an event e;
+ * @return the set of conditions if they all have an image in the preset, NULL
+ * 	otherwise. Note that this is a subset of co and shares memory with it:
+ * 	do not destroy it's histories!
  */
 co_t *test_trans(trans_t *tr, co_t *co)
 {
 	nodelist_t *pre = tr->preset;
 	nodelist_t *context = tr->readarcs;
 	UNFbool good = UNF_TRUE;
+	co_t *pair_co = co_new(tr->preset_size + tr->readarc_size);
+	int count = 0;
 	while (pre != NULL && good == UNF_TRUE) {
 		// TODO: optimize this part: sets of places in the original net
 		// should be kept ordered.
-		
+		int i;
+		// try to find the place of tr's preset in the co-conditions'image
+		for (i=0; i<co->len &&
+			co->conds[i].cond->origin!=(place_t *)pre->node; i++);
+		if (i>=co->len)
+			good = UNF_FALSE;
+		else {
+			// add the found conditions
+			memcpy(pair_co->conds + count, co->conds + i,
+				sizeof(co_cond_t));
+			count++;
+		}
 		pre = pre->next;
+	}
+	while (context != NULL && good == UNF_TRUE) {
+		// TODO: optimize this part: sets of places in the original net
+		// should be kept ordered.
+		int i;
+		// try to find the place of tr's context in the co-conditions'image
+		for (i=0; i<co->len &&
+			co->conds[i].cond->origin!=(place_t *)context->node; i++);
+		if (i>=co->len)
+			good = UNF_FALSE;
+		else {
+			// add the found conditions
+			memcpy(pair_co->conds + count, co->conds + i,
+				sizeof(co_cond_t));
+			count++;
+		}
+		context = context->next;
+	}
+	if (good) {
+		return pair_co;
+	} else {
+		// don't call co_finalize as pair_co shares histories with co
+		free(pair_co->conds);
+		free(pair_co);
+		return NULL;
 	}
 }
 
@@ -139,7 +181,7 @@ co_t *test_trans(trans_t *tr, co_t *co)
  */
 void pe (hist_t *h)
 {
-	array_t *S = im_post_context(event_t *e)
+	array_t *S = im_post_context(h->e);
 	// T gets the list of transitions enabled by places in the postset
 	// and context of e.
 	array_t *T = place_postset(S);

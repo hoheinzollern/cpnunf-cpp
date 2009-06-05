@@ -20,6 +20,7 @@ extern void array_delete(array_t *array);
 extern void array_append(array_t *array, void *val);
 extern void array_insert(array_t *array, int i, void *val);
 
+extern int array_binary_search(array_t *array, void *val);
 /**
  * Ordered insertion: given an ordered array it inserts val at the right
  * position; does not insert duplicate pointers.

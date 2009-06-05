@@ -30,6 +30,6 @@ find_library( GTK_glib_LIBRARY
 include_directories(${GTK_glibconfig_INCLUDE_PATH} ${GTK_glib_INCLUDE_PATH})
 
 add_executable(unfolder common.c main.c marking.c netconv.c nodelist.c readlib.c
-	readpep.c unfold.c order.c dot.c array.c)
+	readpep.c unfold.c order.c pe.c array.c)
 
 target_link_libraries(unfolder ${GTK_glib_LIBRARY})
