@@ -12,6 +12,7 @@ array_t *array_new(int len)
 	array->len = len;
 	array->count = 0;
 	array->data = MYmalloc(sizeof(void *) * len);
+	return array;
 }
 
 void array_delete(array_t *array)
@@ -48,7 +49,7 @@ int array_binary_search(array_t *array, void *val)
 	return k;
 }
 
-void array_insert(array_t *array, void *val)
+void array_insert_ordered(array_t *array, void *val)
 {
 	if (val > array_get(array, array->count-1)) {
 		array_append(array, val);

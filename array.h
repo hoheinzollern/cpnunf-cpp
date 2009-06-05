@@ -1,7 +1,7 @@
 #ifndef ARRAY_H
 #define ARRAY_H
 
-typedef UNFbool unsigned char;
+typedef unsigned char UNFbool;
 #define UNF_FALSE 0
 #define UNF_TRUE !UNF_FALSE
 
@@ -24,7 +24,7 @@ extern void array_insert(array_t *array, int i, void *val);
  * Ordered insertion: given an ordered array it inserts val at the right
  * position; does not insert duplicate pointers.
  */
-extern void array_insert(array_t *array, void *val);
+extern void array_ordered_insert(array_t *array, void *val);
 extern void array_sort(array_t *array);
 #define array_get(array, i) ((array)->data[(i)])
 
