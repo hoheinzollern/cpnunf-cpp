@@ -11,16 +11,13 @@
 void usage(char *myname)
 {
 	fprintf(stderr,
-		"Mora -- unfolder for nets with read arcs\n\n"
-		"Usage: mora [-f] <LLnetfile>\n\n"
+		"Unfolder -- unfolder for nets with read arcs\n\n"
+		"Usage: unfolder <LLnetfile>\n\n"
 
-	"Mora is a spin-off from Mole that works for nets with read arcs.\n"
+	"Unfolder is a spin-off from Mole that works for nets with read arcs.\n"
 	"The output is a dot-compatible graph of the result.\n\n"
 
-	"Option -f outputs the unfolding of the net where read arcs are\n"
-	"replaced by produce/consume loops.\n\n"
-
-	"Version 0.0.3 (21.03.2007)\n");
+	"Version 0.0.1 (14.06.2009)\n");
 
 	exit(1);
 }
@@ -28,7 +25,7 @@ void usage(char *myname)
 /*****************************************************************************/
 
 /**
- * Prova di documentazione, funzione main.
+ * Main function, calls all necessary function for unfolding the net
  * \param argc
  * \param argv 
  * \return the exitcode

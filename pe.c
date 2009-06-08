@@ -14,7 +14,7 @@
 hist_t **pe_queue;		/* the priority array */
 int pe_qsize, pe_qalloc;	/* current/maximum capacity */
 
-/**
+/*
  * Adds the possible extension (tr,pe_conds) to the priority queue.
  *
 void pe_insert (hist_t *h)
@@ -37,7 +37,7 @@ void pe_insert (hist_t *h)
 	pe_queue[index] = qu_new;
 }*/
 
-/**
+/*
  * Remove the minimal event from the queue and restore order.
  *
 pe_queue_t* pe_pop ()
@@ -119,13 +119,19 @@ inline place_t *place(co_cond_t *co_cond)
 }
 
 /**
- * Test whether *tr U _tr_ in co and returns the set of conditions that need to
+ * Test whether \f$\,^\bullet tr \cup \underline{tr}\f$ in co and returns the set of conditions that need to
  * be pairwise concurrent to create a new history for an event e;
+ * @arg tr the transition enabled after the insertion of H
+ * @arg co the set of concurrent conditions for all conditions in
+ * 	\f$e_H^\bullet \cup \underline{e_H}\f$
+ * @arg n_causes a pointer to an integer which will contain the number of causal
+ * 	conditions present in the returned co-structure
  * @return the set of conditions if they all have an image in the preset, NULL
  * 	otherwise. Note that this is a subset of co and shares memory with it:
  * 	do not destroy it's histories!
+ * 	Note that this structure is NOT ordered on conditions!
  */
-co_t *test_trans(trans_t *tr, co_t *co)
+co_t *test_trans(trans_t *tr, co_t *co, int *n_causes)
 {
 	nodelist_t *pre = tr->preset;
 	nodelist_t *context = tr->readarcs;
@@ -149,6 +155,7 @@ co_t *test_trans(trans_t *tr, co_t *co)
 		}
 		pre = pre->next;
 	}
+	*n_causes = count;
 	while (context != NULL && good == UNF_TRUE) {
 		// TODO: optimize this part: sets of places in the original net
 		// should be kept ordered.
@@ -177,6 +184,120 @@ co_t *test_trans(trans_t *tr, co_t *co)
 }
 
 /**
+ * Check if a predecessor is concurrent to all the already inserted predecessors
+ * @return true if it is concurrent to all preds[i], i = 0..j-1; false otherwise
+ */
+UNFbool pairwise_concurrent(pred_t *preds, int j)
+{
+	UNFbool cont = UNF_TRUE;
+	pred_t *pred = preds + j;
+	--j;
+	co_t *co_common = g_hash_table_lookup(pred->cond->pre_ev->co, pred->hist);
+	co_t *co_private = g_hash_table_lookup(pred->cond->co_private, pred->hist);
+	while (cont && j>0) {
+		// TODO: binary search to accelerate this process
+		int k, l;
+		UNFbool found = UNF_FALSE;
+		for (k = 0; !found && k < co_common->len; k++) {
+			if (co_common->conds[k].cond == preds[j].cond) {
+				for (l = 0; !found &&
+					l < co_common->conds[k].hists_len; l++)
+					if (co_common->conds[k].hists[l] == preds[j].hist)
+						found = UNF_TRUE;
+			}
+		}
+		for (k = 0; !found && k < co_private->len; k++) {
+			if (co_private->conds[k].cond == preds[j].cond) {
+				for (l = 0; !found &&
+					l < co_private->conds[k].hists_len; l++)
+					if (co_private->conds[k].hists[l] == preds[j].hist)
+						found = UNF_TRUE;
+			}
+		}
+		if (!found) cont = UNF_FALSE;
+		--j;
+	}
+	return cont;
+}
+
+/**
+ * Tests if an history is chosen causal for a condition
+ * @arg hist the history
+ * @arg cond the condition
+ * @return the result of the test
+ */
+UNFbool hist_causal_for(hist_t *hist, cond_t *cond)
+{
+	if (cond->pre_ev == hist->e)
+		return UNF_TRUE;
+	return UNF_FALSE;
+}
+
+void find_pred(co_t *B, int n_causes, pred_t *preds, int depth, int *pred_n)
+{
+	if (depth == 0) {
+		pred_n = (int *)MYmalloc(sizeof(int));
+		*pred_n = 0;
+	}
+	if (depth < B->len) {
+		int i;
+		co_cond_t *cond = B->conds + depth;
+		preds[*pred_n]->cond = cond->cond;
+		if (n_causes < depth) {
+			SET_FLAG(preds[*pred_n]->flags, HIST_C);
+			// Chose an history for the current condition, check if
+			// it is pairwise concurrent with all other histories;
+			// if so continue computing the predecessors with this
+			// history.
+			for (i = 0; i<cond->hists_len; i++) {
+				preds[*pred_n]->hist = cond->hists[i];
+				if (pairwise_concurrent(preds, *pred_n)) {
+					// all chosen predecessors are pairwise 
+					// concurrent, go on.
+					++*pred_n;
+					find_pred(B, n_causes, preds, depth + 1, pred_n);
+					--*pred_n;
+				}
+			}
+		} else {
+			SET_FLAG(preds[*pred_n]->flags, HIST_R);
+			// Chose a causal history for the current condition,
+			// check if it is pairwise concurrent with all other
+			// histories; if so continue computing the predecessors
+			// with this history.
+			for (i = 0; i<cond->hists_len; i++) {
+				preds[*pred_n]->hist = cond->hists[i];
+				if (hist_causal_for(preds[*pred_n]->hist, preds[*pred_n]->cond)
+					&& pairwise_concurrent(preds, *pred_n)) {
+					// all chosen predecessors are pairwise concurrent, go on.
+					++*pred_n;
+					find_pred(B, n_causes, preds, depth + 1, pred_n);
+					--*pred_n;
+				}
+			}
+			//			OR
+			// Chose a set of read histories and do the same thing.
+			// TODO
+			for (i = 0; i<cond->hists_len; i++) {
+				preds[*pred_n]->hist = cond->hists[i];
+				if (!hist_causal_for(preds[*pred_n]->hist, preds[*pred_n]->cond)
+					&& pairwise_concurrent(preds, *pred_n)) {
+					// all chosen predecessors are pairwise concurrent, go on.
+					++*pred_n;
+					find_pred(B, n_causes, preds, depth + 1, pred_n);
+					--*pred_n;
+				}
+			}
+		}
+	} else {
+		// we found a set of concurrent predecessors for H, add it to pe
+	}
+	if (depth == 0) {
+		free(pred_n);
+	}
+}
+
+/**
  * Find the new possible extensions created by the addition of h.
  */
 void pe (hist_t *h)
@@ -188,5 +309,15 @@ void pe (hist_t *h)
 	array_delete(S);
 	
 	co_t *co = (co_t *)g_hash_table_lookup(h->e->co, h);
-	
+	int i;
+	for (i = 0; i<T->len; i++) {
+		int n_causes;
+		co_t *B = test_trans(array_get(T, i), co, &n_causes);
+		if (B != NULL) {
+			// *t U _t_ is a subset of im(co)
+			pred_t *pred = (pred_t *)MYmalloc(sizeof(pred_t) * B->len);
+			find_pred(B, n_causes, pred, 0);
+			free(pred);
+		}
+	}
 }
