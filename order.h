@@ -16,4 +16,7 @@ typedef struct parikh_vec_t
 	unsigned int count;
 } parikh_vec_t;
 
+void size_mark(hist_t *hist);
+int pe_compare (hist_t *pe1, hist_t *pe2);
+
 #endif

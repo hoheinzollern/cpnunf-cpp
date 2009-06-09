@@ -1,5 +1,6 @@
 #include "common.h"
 #include "unfold.h"
+#include "order.h"
 #include <string.h>
 
 /*****************************************************************************/
@@ -11,21 +12,25 @@
  */
 
 #define PE_ALLOC_STEP 1024
-hist_t **pe_queue;		/* the priority array */
-int pe_qsize, pe_qalloc;	/* current/maximum capacity */
+/// the priority array
+hist_t **pe_queue;
+/// current capacity
+int	pe_qsize,
+/// maximum capacity
+	pe_qalloc;
 
-/*
+/**
  * Adds the possible extension (tr,pe_conds) to the priority queue.
- *
+ */
 void pe_insert (hist_t *h)
 {
-	hist_t *qu_new = create_queue_entry(tr);
+	hist_t *qu_new = h;
 	int index = ++pe_qsize;
 
 	if (pe_qsize >= pe_qalloc)
 	{
 		pe_qalloc += PE_ALLOC_STEP;
-		pe_queue = MYrealloc(pe_queue,pe_qalloc * sizeof(pe_queue_t*));
+		pe_queue = MYrealloc(pe_queue,pe_qalloc * sizeof(hist_t*));
 	}
 
 	// insert new element at the end, then move upwards as needed
@@ -35,15 +40,15 @@ void pe_insert (hist_t *h)
 		pe_queue[index] = pe_queue[index/2]; // move parent downwards
 	}
 	pe_queue[index] = qu_new;
-}*/
+}
 
-/*
+/**
  * Remove the minimal event from the queue and restore order.
- *
-pe_queue_t* pe_pop ()
+ */
+hist_t* pe_pop ()
 {
-	pe_queue_t *first = pe_queue[1];
-	pe_queue_t *last;
+	hist_t *first = pe_queue[1];
+	hist_t *last;
 	int index = 1, newindex;
 
 	if (!pe_qsize) return NULL;
@@ -70,7 +75,7 @@ pe_queue_t* pe_pop ()
 	}
 	pe_queue[index] = last;
 	return first;
-}*/
+}
 
 /**
  * @arg e an event
@@ -111,11 +116,6 @@ array_t *place_postset(array_t *S)
 			cont = cont->next;
 		}
 	}
-}
-
-inline place_t *place(co_cond_t *co_cond)
-{
-	return co_cond->cond->origin;
 }
 
 /**
@@ -234,7 +234,7 @@ UNFbool hist_causal_for(hist_t *hist, cond_t *cond)
 	return UNF_FALSE;
 }
 
-void find_pred(co_t *B, int n_causes, pred_t *preds, int depth, int *pred_n);
+void find_pred(trans_t *t, co_t *B, int n_causes, pred_t *preds, int depth, int *pred_n);
 /**
  * Recursive function; computes all possible subsets of concurrent read histories
  */
@@ -261,6 +261,22 @@ void read_hist_subset_rec(trans_t *t, co_t *B, int n_causes, pred_t *preds, int 
 		}
 	} else {
 		find_pred(t, B, n_causes, preds, depth+1, pred_n);
+	}
+}
+
+void pred_sort(pred_t *pred, int pred_n)
+{
+	int i, j;
+	for (i=1; i<pred_n; i++) {
+		j = i-1;
+		pred_t tmp = pred[i];
+		while (j>=0 && pred[j].cond > tmp.cond) {
+			pred[j+1] = pred[j];
+			--j;
+		}
+		pred[j+1] = tmp;
+		// TODO: check if structure assignment makes a valid copy of
+		// the entire structure.
 	}
 }
 
@@ -335,23 +351,39 @@ void find_pred(trans_t *t, co_t *B, int n_causes, pred_t *preds, int depth, int 
 		// we found a set of concurrent predecessors for H, add it to pe;
 		// find if there is already the event in the unfolding; if not,
 		// create it.
-		array_t *ps = NULL;
+		array_t *events = NULL;
 		if (n_causes>0)
-			ps = preds->cond->postset;
+			events = preds->cond->postset;
 		else
-			ps = preds->cond->readarcs;
+			events = preds->cond->readarcs;
 		int j = 0;
-		while (j<ps->len && (event_t*)array_get(ps, j)->origin != t)
+		while (j<events->len && ((event_t*)array_get(events, j))->origin != t)
 			j++;
-		if (j>=ps->len) {
+		event_t *e;
+		if (j>=events->len) {
 			// Event not found, create it.
 			// Create array for preset and readarcs
-			// TODO
+			array_t *preset = array_new(n_causes);
+			for (j = 0; j<n_causes; j++)
+				array_get(preset, j) = B->conds[j].cond;
+			array_t *readarcs = array_new(B->len - n_causes);
+			for (j = n_causes; j<B->len; j++)
+				array_get(readarcs, j-n_causes) = B->conds[j].cond;
 			// Create the event
-			nc_event_new();
-		}
-		// Sort predecessors list on conditions:
-		// TODO
+			e = nc_event_new(t, preset, readarcs);
+		} else
+			e = (event_t*)array_get(events, j);
+		
+		hist_t *hist = (hist_t *)MYmalloc(sizeof(hist_t));
+		hist->e = e;
+		hist->flags = 0;
+		hist->pred = MYmalloc(sizeof(pred_t) * *pred_n);
+		hist->pred_n = *pred_n;
+		memcpy(hist->pred, preds, *pred_n * sizeof(pred_t));
+		pred_sort(hist->pred, hist->pred_n);
+		size_mark(hist);
+		// Add the newly created history to the list of possible extensions
+		pe_insert(hist);
 	}
 	if (depth == 0) {
 		free(pred_n);
@@ -377,7 +409,7 @@ void pe (hist_t *h)
 		co_t *B = test_trans(array_get(T, i), co, &n_causes);
 		if (B != NULL) {
 			// *t U _t_ is a subset of im(co)
-			find_pred(B, n_causes, NULL, 0, NULL);
+			find_pred(array_get(T, i), B, n_causes, NULL, 0, NULL);
 		}
 	}
 }

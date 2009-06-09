@@ -334,20 +334,21 @@ int foata_compare (pe_queue_t *pe1, pe_queue_t *pe2)
 /**
  * Compares two possible extensions according to the <_E order from [ERV02].
  * Returns -1 if pe1 < pe2, and 1 if pe1 > pe2, 0 otherwise (can't happen?).
- *
-int pe_compare (pe_queue_t *pe1, pe_queue_t *pe2)
+ */
+int pe_compare (hist_t *pe1, hist_t *pe2)
 {
 	int res;
 
 	// Try to decide by local configuration size first.
-	if (pe1->lc_size < pe2->lc_size) return -1;
-	if (pe1->lc_size > pe2->lc_size) return 1;
+	if (pe1->size < pe2->size) return -1;
+	if (pe1->size > pe2->size) return 1;
 
 	// Then decide by comparing the Parikh vectors.
-	if ((res = parikh_compare(pe1->p_vector,pe2->p_vector)))
+	if ((res = parikh_compare(pe1->parikh->parikh, pe2->parikh->parikh)))
 		return res;
 
+	return 0;
+	// TODO:
 	// Finally, decide by Foata normal form.
-	return foata_compare(pe1,pe2);
+	//return foata_compare(pe1,pe2);
 }
-*/

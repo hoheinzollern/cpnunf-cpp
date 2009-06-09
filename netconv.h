@@ -110,6 +110,7 @@ typedef struct hist_t {
 	/// the number of predecessors
 	int pred_n;
 	
+	/// needed to compute the cardinality
 	unsigned char flags;
 } hist_t;
 
