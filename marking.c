@@ -20,11 +20,11 @@ void marking_init ()
 	hash = MYcalloc(hash_buckets * sizeof(hashcell_t*));
 }
 
-/*****************************************************************************/
-/* Compute the hash value of a marking.					     */
-/* TODO: Is this a good hash function?? If not, replace by something better. */
-/* Also, this might be the only place that really needs pl->num.	     */
-
+/**
+ * Compute the hash value of a marking.  
+ * TODO: Is this a good hash function?? If not, replace by something better
+ * Also, this might be the only place that really needs pl->num.
+ */
 int marking_hash (nodelist_t *marking)
 {
 	unsigned int val = 0, i = 0;
@@ -36,11 +36,11 @@ int marking_hash (nodelist_t *marking)
 	return val % hash_buckets;
 }
 
-/*****************************************************************************/
-/* Add a marking to the hash table. It is assumed that marking = Mark([ev]). */
-/* Return 1 if the marking was not yet present; otherwise, add ev to the     */
-/* list of cut-off events and return 0.					     */
-
+/**
+ * Add a marking to the hash table. It is assumed that marking = Mark([ev]).
+ * Return 1 if the marking was not yet present; otherwise, add ev to the
+ * list of cut-off events and return 0.
+ */
 int add_marking (nodelist_t *marking, event_t *ev)
 {
 	hashcell_t *newbuck;
@@ -67,9 +67,9 @@ int add_marking (nodelist_t *marking, event_t *ev)
 	return 1;
 }
 
-/*****************************************************************************/
-/* Collect the initial marking.						     */
-
+/**
+ * Collect the initial marking.
+ */
 nodelist_t* marking_initial ()
 {
 	place_t *pl;

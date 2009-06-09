@@ -245,6 +245,9 @@ extern trans_t* nc_create_transition (net_t*);
 extern void nc_create_arc (struct nodelist_t**,struct nodelist_t**,void*,void*);
 extern void nc_compute_sizes (net_t*);
 extern void nc_static_checks (net_t*,char*);
+extern cond_t *nc_cond_new(place_t *pl, event_t *ev);
+extern event_t *nc_event_new(trans_t *tr, array_t *pre, array_t *read);
+extern void nc_add_event(event_t *ev);
 
 /*****************************************************************************/
 /* declarations from nodelist.c						     */

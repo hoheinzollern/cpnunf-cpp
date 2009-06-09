@@ -337,11 +337,11 @@ co_t *co_relation(hist_t *hist)
 				(co_t*)g_hash_table_lookup(
 					pred->hist->e->co, pred->hist)
 			);
-			if (tmp)
+			if (tmp) {
 				co_intersect(co_b, tmp);
-			else
+				co_finalize(co_b);
+			} else
 				tmp = co_b;
-			co_finalize(co_b);
 		} else if (HAS_FLAG(pred->flags, HIST_R)) {
 			co_t *co_b = co_union(
 				g_hash_table_lookup(pred->cond->co_private,
@@ -353,12 +353,12 @@ co_t *co_relation(hist_t *hist)
 				g_hash_table_lookup(pred->hist->e->qco,
 					pred->hist)
 						 );
-			if (tmp)
-				co_intersect(co_qco_b, tmp);
-			else
-				tmp = co_qco_b;
 			co_finalize(co_b);
-			co_finalize(co_qco_b);
+			if (tmp) {
+				co_intersect(co_qco_b, tmp);
+				co_finalize(co_qco_b);
+			} else
+				tmp = co_qco_b;
 		}
 		pred++;
 	}
