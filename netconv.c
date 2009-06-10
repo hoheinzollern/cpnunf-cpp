@@ -9,13 +9,12 @@
 #include "netconv.h"
 #include "unfold.h"
 
-int event_last = -1;
+int event_last = 0;
 int cond_last = 0;
 
-/****************************************************************************/
-/* nc_create_net							    */
-/* Creates a new net without places or transitions.			    */
-
+/**
+ * Creates a new net without places or transitions.
+ */
 net_t* nc_create_net()
 {
 	net_t *net = MYmalloc(sizeof(net_t));
@@ -25,6 +24,9 @@ net_t* nc_create_net()
 	return net;
 }
 
+/**
+ * Creates an empty unfolding
+ */
 unf_t* nc_create_unfolding()
 {
 	unf_t *unf = MYmalloc(sizeof(unf_t));
@@ -35,7 +37,6 @@ unf_t* nc_create_unfolding()
 }
 
 /**
- * nc_create_place
  * Creates a new place in the given net. The new node has no
  * incoming or outgoing arcs.
  */
@@ -50,7 +51,6 @@ place_t* nc_create_place (net_t *net)
 }
 
 /**
- * nc_create_transition
  * Creates a new transition in the given net. The new node has no
  * incoming or outgoing arcs and is unmarked.
  */
@@ -66,7 +66,6 @@ trans_t* nc_create_transition (net_t *net)
 }
 
 /**
- * nc_create_arc
  * Create an arc between two nodes (place->transition or transition->place)
  */
 void nc_create_arc (nodelist_t **fromlist, nodelist_t **tolist,
@@ -82,7 +81,6 @@ void nc_create_arc (nodelist_t **fromlist, nodelist_t **tolist,
 }
 
 /**
- * nc_compute_sizes
  * compute (maximal) sizes of transition presets/postsets
  */
 void nc_compute_sizes (net_t *net)
@@ -200,5 +198,17 @@ void nc_add_event(event_t *ev)
 	{
 		cond_t *cond = array_get(ev->postset, i);
 		g_hash_table_insert(unf->events, cond, cond);
+	}
+	
+	// Update reverse link side
+	for (i=0; i<ev->preset->len; i++)
+	{
+		cond_t *cond = array_get(ev->preset, i);
+		array_insert_ordered(cond->postset, ev);
+	}
+	for (i=0; i<ev->readarcs->len; i++)
+	{
+		cond_t *cond = array_get(ev->readarcs, i);
+		array_insert_ordered(cond->readarcs, ev);
 	}
 }

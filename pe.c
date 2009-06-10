@@ -45,7 +45,7 @@ void pe_insert (hist_t *h)
 /**
  * Remove the minimal event from the queue and restore order.
  */
-hist_t* pe_pop ()
+hist_t *pe_pop ()
 {
 	hist_t *first = pe_queue[1];
 	hist_t *last;

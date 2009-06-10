@@ -25,7 +25,7 @@ extern int array_binary_search(array_t *array, void *val);
  * Ordered insertion: given an ordered array it inserts val at the right
  * position; does not insert duplicate pointers.
  */
-extern void array_ordered_insert(array_t *array, void *val);
+extern void array_insert_ordered(array_t *array, void *val);
 extern void array_sort(array_t *array);
 #define array_get(array, i) ((array)->data[(i)])
 

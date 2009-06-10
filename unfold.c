@@ -2,6 +2,8 @@
 
 #include "common.h"
 #include "netconv.h"
+#include "pe.h"
+#include "marking.h"
 #include "unfold.h"
 
 net_t *net;	/* stores the net	*/
@@ -15,8 +17,6 @@ event_t **events;			/* event queue in pe_conflict etc. */
 trans_t *stoptr = NULL;			/* transition in -T switch         */
 
 nodelist_t *cutoff_list, *corr_list;	/* cut-off list, corresponding events */
-
-enum { CUTOFF_NO, CUTOFF_YES };
 
 /**
  * creates a new empty co structure
@@ -446,15 +446,76 @@ void add_history(hist_t *hist)
 	g_hash_table_insert(hist->e->qco, hist, qco_rel);
 	
 	// Adds the marking of hist to the unfolding
-	g_hash_table_insert(unf->markings, hist->parikh, hist->parikh);
+	g_hash_table_insert(unf->markings, hist->parikh, hist);
 }
 
 /*****************************************************************************/
+
+/**
+ * Checks if h is a local cutoff
+ */
+UNFbool cutoff(hist_t *h1)
+{
+	hist_t *h2 = g_hash_table_lookup(unf->markings, h1->parikh);
+	return (h2 != NULL && pe_compare(h1, h2) > 0);
+}
 
 /**
  * Computes the unfolding of the net
  */
 void unfold ()
 {
+	unf = nc_create_unfolding();
 	
+	// root event and initial marking:
+	event_t *ev = unf->root = (event_t *)MYmalloc(sizeof(event_t));
+	ev->num = -1;
+	
+	ev->origin = NULL;
+	ev->preset = array_new(0);
+	ev->readarcs = array_new(0);
+	
+	// Adds the initial marking for the root event
+	unf->m0 = marking_initial();
+	array_t *post = ev->postset = array_new(1);
+	nodelist_t *ps = unf->m0;
+	while (ps) {
+		cond_t *cond = nc_cond_new(ps->node, ev);
+		array_append(post, cond);
+		ps = ps->next;
+	}
+	array_sort(post);
+	
+	ev->co = g_hash_table_new(NULL, NULL);
+	ev->qco = g_hash_table_new(NULL, NULL);
+	ev->hist = g_hash_table_new(NULL, NULL);
+	
+	// empty history for root event
+	hist_t *h0 = (hist_t *)MYmalloc(sizeof(hist_t));
+	g_hash_table_insert(ev->hist, h0, h0);
+	h0->e = ev;
+	h0->flags = 0;
+	h0->pred = NULL;
+	h0->pred_n = 0;
+	size_mark(h0);
+	// initialize co-conditions:
+	co_t *co = co_new(ev->postset->len);
+	int i;
+	for (i=0; i<ev->postset->len; i++) {
+		co->conds[i].cond = (cond_t *)array_get(ev->postset, i);
+		co->conds[i].hists = (hist_t **)MYmalloc(sizeof(hist_t *));
+		co->conds[i].hists_len = 1;
+		co->conds[i].hists[0] = h0;
+	}
+	g_hash_table_insert(ev->co, h0, co);
+	
+	// Unfolding:
+	hist_t *h = NULL;
+	while ((h = pe_pop()) != NULL) {
+		if (!cutoff(h)) {
+			add_history(h);
+			pe(h);
+		} else
+			nodelist_push(&cutoff_list, h);
+	} 
 }
