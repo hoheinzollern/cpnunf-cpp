@@ -19,6 +19,7 @@ parikh_vec_t *parikh_new ()
 	vec->last = vec->parikh = MYmalloc(net->numtr * sizeof(parikh_t));
 	vec->size = net->numtr;
 	vec->count = 0;
+	return vec;
 }
 
 /**
@@ -109,7 +110,7 @@ int parikh_compare (parikh_t *pv1, parikh_t *pv2)
 
 int size_mark_rec(hist_t *hist, parikh_vec_t *vec)
 {
-	if (!HAS_FLAG(hist->flags, BLACK)) {
+	if (!HAS_FLAG(hist->flags, BLACK) && hist->e->num != -1) {
 		SET_FLAG(hist->flags, BLACK);
 		parikh_add(vec, hist->e->origin->num);
 		int size = 1;

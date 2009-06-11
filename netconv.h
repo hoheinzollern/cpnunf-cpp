@@ -12,11 +12,11 @@
 
 #define COARRAY_TYPE void
 
-#define HAS_FLAG(flags, flag) ((flags) & (flag) == (flag))
+#define HAS_FLAG(flags, flag) (((flags) & (flag)) == (flag))
 
-#define SET_FLAG(flags, flag) ((flags) = (flags) & ~(flag) | (flag))
+#define SET_FLAG(flags, flag) ((flags) = (((flags) & ~(flag)) | (flag)))
 
-#define CLEAN_FLAG(flags, flag) ((flags) = (flags) & ~(flag))
+#define CLEAN_FLAG(flags, flag) ((flags) = ((flags) & ~(flag)))
 
 #define HIST_R 0x01
 #define HIST_C 0x02
@@ -267,7 +267,7 @@ extern net_t* read_pep_net(char*);
 /****************************************************************************/
 /* declarations for dot.c						    */
 
-extern void write_dot_output (unf_t*, nodelist_t*, char);
+extern void write_dot_output (unf_t*, nodelist_t*);
 extern void* reverse_list (void*);
 
 #endif

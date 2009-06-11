@@ -20,6 +20,15 @@ int	pe_qsize,
 	pe_qalloc;
 
 /**
+ * Initializes the queue
+ */
+void pe_init ()
+{
+	pe_qsize = 0;
+	pe_queue = MYmalloc((pe_qalloc = PE_ALLOC_STEP) * sizeof(hist_t*));
+}
+
+/**
  * Adds the possible extension (tr,pe_conds) to the priority queue.
  */
 void pe_insert (hist_t *h)
@@ -116,6 +125,7 @@ array_t *place_postset(array_t *S)
 			cont = cont->next;
 		}
 	}
+	return T;
 }
 
 /**

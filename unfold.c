@@ -73,7 +73,6 @@ void co_finalize(co_t *co)
  */
 void hist_intersect(hist_t **a, int len_a, hist_t ***b, int *len_b)
 {
-	int size_b = *len_b;
 	*len_b = 0;
 	hist_t	**last_a = a + len_a,
 		**last_b = *b + *len_b,
@@ -266,7 +265,7 @@ void co_insert(co_t *co, cond_t *cond, hist_t *hist)
 {
 	co_cond_t *conds = co->conds;
 	int i = 0, len = co->len;
-	// Navy search of the place; TODO: consider binary search
+	// Naive search of the place; TODO: consider binary search
 	while (i < len && conds[i].cond < cond)
 		i++;
 	if (i < len && conds[i].cond == cond) {
@@ -316,6 +315,7 @@ co_t *co_postset_e(hist_t *hist)
 		*(cond->hists) = hist;
 		cond++; i++;
 	}
+	return co;
 }
 
 /**
@@ -510,6 +510,8 @@ void unfold ()
 	g_hash_table_insert(ev->co, h0, co);
 	
 	// Unfolding:
+	pe_init();
+	pe(h0);
 	hist_t *h = NULL;
 	while ((h = pe_pop()) != NULL) {
 		if (!cutoff(h)) {

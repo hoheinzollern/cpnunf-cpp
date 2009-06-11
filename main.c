@@ -55,7 +55,7 @@ int main (int argc, char **argv)
 
 	unfold();
 
-	write_dot_output(unf,cutoff_list,0);
+	write_dot_output(unf,cutoff_list);
 
 	return exitcode;
 }
