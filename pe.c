@@ -95,10 +95,10 @@ array_t *im_post_context(event_t *e)
 	int len = e->postset->len + e->readarcs->len;
 	array_t *places = array_new(len);
 	int i = 0;
-	for (i = 0; i < e->postset->len; i++)
+	for (i = 0; i < e->postset->count; i++)
 		array_append(places, ((cond_t *)
 			array_get(e->postset, i))->origin);
-	for (i = 0; i < e->readarcs->len; i++)
+	for (i = 0; i < e->readarcs->count; i++)
 		array_append(places, ((cond_t *)
 			array_get(e->readarcs, i))->origin);
 	return places;
@@ -107,13 +107,13 @@ array_t *im_post_context(event_t *e)
 /**
  * Computes the postset of a set of places S
  * @arg S the unordered set of places
- * @arg T the ordered set of transitions
+ * @return the ordered set of transitions (no duplicates)
  */
 array_t *place_postset(array_t *S)
 {
 	array_t *T = array_new(1);
 	int i;
-	for (i = 0; i < S->len; i++) {
+	for (i = 0; i < S->count; i++) {
 		nodelist_t *post = ((place_t *)array_get(S, i))->postset;
 		while (post != NULL) {
 			array_insert_ordered(T, post->node);
@@ -144,54 +144,57 @@ array_t *place_postset(array_t *S)
  */
 co_t *test_trans(trans_t *tr, co_t *co, int *n_causes)
 {
-	nodelist_t *pre = tr->preset;
-	nodelist_t *context = tr->readarcs;
-	UNFbool good = UNF_TRUE;
-	co_t *pair_co = co_new(tr->preset_size + tr->readarc_size);
-	int count = 0;
-	while (pre != NULL && good == UNF_TRUE) {
-		// TODO: optimize this part: sets of places in the original net
-		// should be kept ordered.
-		int i;
-		// try to find the place of tr's preset in the co-conditions'image
-		for (i=0; i<co->len &&
-			co->conds[i].cond->origin!=(place_t *)pre->node; i++);
-		if (i>=co->len)
-			good = UNF_FALSE;
-		else {
-			// add the found conditions
-			memcpy(pair_co->conds + count, co->conds + i,
-				sizeof(co_cond_t));
-			count++;
+	if (tr!=NULL) {
+		nodelist_t *pre = tr->preset;
+		nodelist_t *context = tr->readarcs;
+		UNFbool good = UNF_TRUE;
+		co_t *pair_co = co_new(tr->preset_size + tr->readarc_size);
+		int count = 0;
+		while (pre != NULL && good == UNF_TRUE) {
+			// TODO: optimize this part: sets of places in the original net
+			// should be kept ordered.
+			int i;
+			// try to find the place of tr's preset in the co-conditions'image
+			for (i=0; i<co->len &&
+				co->conds[i].cond->origin!=(place_t *)pre->node; i++);
+			if (i>=co->len)
+				good = UNF_FALSE;
+			else {
+				// add the found conditions
+				memcpy(pair_co->conds + count, co->conds + i,
+					sizeof(co_cond_t));
+				count++;
+			}
+			pre = pre->next;
 		}
-		pre = pre->next;
-	}
-	*n_causes = count;
-	while (context != NULL && good == UNF_TRUE) {
-		// TODO: optimize this part: sets of places in the original net
-		// should be kept ordered.
-		int i;
-		// try to find the place of tr's context in the co-conditions'image
-		for (i=0; i<co->len &&
-			co->conds[i].cond->origin!=(place_t *)context->node; i++);
-		if (i>=co->len)
-			good = UNF_FALSE;
-		else {
-			// add the found conditions
-			memcpy(pair_co->conds + count, co->conds + i,
-				sizeof(co_cond_t));
-			count++;
+		*n_causes = count;
+		while (context != NULL && good == UNF_TRUE) {
+			// TODO: optimize this part: sets of places in the original net
+			// should be kept ordered.
+			int i;
+			// try to find the place of tr's context in the co-conditions'image
+			for (i=0; i<co->len &&
+				co->conds[i].cond->origin!=(place_t *)context->node; i++);
+			if (i>=co->len)
+				good = UNF_FALSE;
+			else {
+				// add the found conditions
+				memcpy(pair_co->conds + count, co->conds + i,
+					sizeof(co_cond_t));
+				count++;
+			}
+			context = context->next;
 		}
-		context = context->next;
-	}
-	if (good) {
-		return pair_co;
-	} else {
-		// don't call co_finalize as pair_co shares histories with co
-		free(pair_co->conds);
-		free(pair_co);
+		if (good) {
+			return pair_co;
+		} else {
+			// don't call co_finalize as pair_co shares histories with co
+			free(pair_co->conds);
+			free(pair_co);
+			return NULL;
+		}
+	} else 
 		return NULL;
-	}
 }
 
 /**
@@ -367,10 +370,10 @@ void find_pred(trans_t *t, co_t *B, int n_causes, pred_t *preds, int depth, int 
 		else
 			events = preds->cond->readarcs;
 		int j = 0;
-		while (j<events->len && ((event_t*)array_get(events, j))->origin != t)
+		while (j<events->count && ((event_t*)array_get(events, j))->origin != t)
 			j++;
 		event_t *e;
-		if (j>=events->len) {
+		if (j>=events->count) {
 			// Event not found, create it.
 			// Create array for preset and readarcs
 			array_t *preset = array_new(n_causes);
@@ -414,7 +417,7 @@ void pe (hist_t *h)
 	
 	co_t *co = (co_t *)g_hash_table_lookup(h->e->co, h);
 	int i;
-	for (i = 0; i<T->len; i++) {
+	for (i = 0; i<T->count; i++) {
 		int n_causes;
 		co_t *B = test_trans(array_get(T, i), co, &n_causes);
 		if (B != NULL) {

@@ -148,7 +148,7 @@ void co_drop_preset(co_t *co, event_t *ev)
 	array_t *pre = ev->preset;
 	int i = 0;
 	
-	while (i < pre->len && cond2 < lastcond) {
+	while (i < pre->count && cond2 < lastcond) {
 		if (g_array_index(pre, cond_t *, i) == cond2->cond) {
 			free(cond2->hists);
 			cond2->hists = NULL;
@@ -305,7 +305,7 @@ void co_insert(co_t *co, cond_t *cond, hist_t *hist)
 co_t *co_postset_e(hist_t *hist)
 {
 	array_t *post = hist->e->postset;
-	co_t *co = co_new(post->len);
+	co_t *co = co_new(post->count);
 	co_cond_t *cond = co->conds, *last_cond = co->conds + co->len;
 	int i = 0;
 	while (cond < last_cond) {
@@ -382,7 +382,7 @@ co_t *co_relation(hist_t *hist)
 						     co_b1);
 			}
 			int i = 0;
-			for (; i < post_e->len; i++) {
+			for (; i < post_e->count; i++) {
 				cond_t *b = g_array_index(post_e, cond_t *, i);
 				co_insert(co_b1, b, hist);
 			}
@@ -499,9 +499,9 @@ void unfold ()
 	h0->pred_n = 0;
 	size_mark(h0);
 	// initialize co-conditions:
-	co_t *co = co_new(ev->postset->len);
+	co_t *co = co_new(ev->postset->count);
 	int i;
-	for (i=0; i<ev->postset->len; i++) {
+	for (i=0; i<ev->postset->count; i++) {
 		co->conds[i].cond = (cond_t *)array_get(ev->postset, i);
 		co->conds[i].hists = (hist_t **)MYmalloc(sizeof(hist_t *));
 		co->conds[i].hists_len = 1;
