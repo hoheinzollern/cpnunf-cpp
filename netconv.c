@@ -24,13 +24,37 @@ net_t* nc_create_net()
 	return net;
 }
 
+guint mark_hash(gconstpointer pvec)
+{
+	parikh_vec_t *parikh = (parikh_vec_t *)pvec;
+	guint res1 = 0, res2 = 0, i;
+	for (i = 0; i < parikh->size; i++) {
+		res1 += parikh->parikh[i].appearances;
+		res2 += parikh->parikh[i].tr_num;
+	}
+	return res1 + res2;
+}
+
+gboolean mark_equal(gconstpointer v1, gconstpointer v2)
+{
+	int i;
+	parikh_vec_t *vec1 = (parikh_vec_t*)v1,
+		*vec2 = (parikh_vec_t*)v2;
+	gboolean res = vec1->size==vec2->size;
+	for (i = 0; res && i < vec1->size; i++) {
+		res = (vec1->parikh[i].tr_num == vec2->parikh[i].tr_num) &&
+		      (vec1->parikh[i].appearances == vec2->parikh[i].appearances);
+	}
+	return res;
+}
+
 /**
  * Creates an empty unfolding
  */
 unf_t* nc_create_unfolding()
 {
 	unf_t *unf = MYmalloc(sizeof(unf_t));
-	unf->markings = g_hash_table_new(NULL, NULL);
+	unf->markings = g_hash_table_new(mark_hash, mark_equal);
 	unf->conditions = g_hash_table_new(NULL, NULL);
 	unf->events = g_hash_table_new(NULL, NULL);
 	return unf;

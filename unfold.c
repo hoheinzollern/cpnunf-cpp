@@ -25,11 +25,15 @@ co_t *co_new(int size)
 {
 	co_t *co = MYmalloc(sizeof(co_t));
 	co->len = size;
-	co->conds = MYmalloc(sizeof(co_cond_t) * size);
-	co_cond_t *co_cond;
-	for (co_cond = co->conds; co_cond<co->conds+size; ++co_cond) {
-		co_cond->cond = NULL;
-		co_cond->hists = NULL;
+	if (size > 0) {
+		co->conds = MYmalloc(sizeof(co_cond_t) * size);
+		co_cond_t *co_cond;
+		for (co_cond = co->conds; co_cond<co->conds+size; ++co_cond) {
+			co_cond->cond = NULL;
+			co_cond->hists = NULL;
+		}
+	} else {
+		co->conds = NULL;
 	}
 	return co;
 }
@@ -116,7 +120,6 @@ void co_intersect(co_t *a, co_t *b)
 				       &(cond_b->hists), &(cond_b->hists_len));
 			cond_c->hists_len = cond_b->hists_len;
 			cond_c->hists = cond_b->hists;
-			cond_b->hists = NULL;
 			cond_a++; cond_b++; cond_c++; len_c++;
 		} else if (cond_a->cond < cond_b->cond) {
 			cond_a++;
@@ -143,29 +146,22 @@ void co_intersect(co_t *a, co_t *b)
  */
 void co_drop_preset(co_t *co, event_t *ev)
 {
-	co_cond_t *cond1 = co->conds, *cond2 = co->conds,
-		*lastcond = co->conds + co->len;
 	array_t *pre = ev->preset;
-	int i = 0;
+	int i = 0, cond = 0;
 	
-	while (i < pre->count && cond2 < lastcond) {
-		if (g_array_index(pre, cond_t *, i) == cond2->cond) {
-			free(cond2->hists);
-			cond2->hists = NULL;
-			cond2++; i++;
+	while (i < pre->count && cond < co->len) {
+		if ((cond_t*)array_get(pre, i) == co->conds[cond].cond) {
+			free(co->conds[cond].hists);
+			memmove(co->conds + cond, co->conds + cond + 1,
+				sizeof(co_cond_t)*(co->len - cond - 1));
+			cond++; i++;
 			co->len--;
-		} else if (cond1 != cond2) {
-			*cond1 = *cond2;
-			cond1++; cond2++;
 		} else {
-			cond1++; cond2++;
+			cond++;
 		}
 	}
-	while (cond1 < lastcond) {
-		cond1->cond = NULL;
-		cond1->hists_len = 0;
-		cond1->hists = NULL;
-	}
+	for (i = 0; i < co->len; i++)
+		g_assert(co->conds[i].hists!=NULL);
 }
 
 /**
@@ -175,8 +171,12 @@ void co_cond_copy(co_cond_t *dst, co_cond_t *src)
 {
 	dst->cond = src->cond;
 	dst->hists_len = src->hists_len;
-	dst->hists = MYmalloc(sizeof(hist_t *) * dst->hists_len);
-	memcpy(dst->hists, src->hists, sizeof(hist_t *) * dst->hists_len);
+	if (src->hists_len > 0) {
+		dst->hists = MYmalloc(sizeof(hist_t *) * dst->hists_len);
+		memcpy(dst->hists, src->hists, sizeof(hist_t *) * dst->hists_len);
+	} else {
+		dst->hists = NULL;
+	}
 }
 
 /**
@@ -225,7 +225,7 @@ co_t *co_union(co_t *a, co_t *b)
 		  *last_b = b->conds + b->len;
 	while (cond_a < last_a && cond_b < last_b) {
 		if (cond_a->cond < cond_b->cond) {
-			co_cond_copy(cond_a, cond_c);
+			co_cond_copy(cond_c, cond_a);
 			cond_a++;
 		} else if (cond_a->cond == cond_b->cond) {
 			cond_c->cond = cond_a->cond;
@@ -233,20 +233,20 @@ co_t *co_union(co_t *a, co_t *b)
 				   cond_b->hists, cond_b->hists_len,
 				   &(cond_c->hists), &(cond_c->hists_len));
 		} else {
-			co_cond_copy(cond_b, cond_c);
+			co_cond_copy(cond_c, cond_b);
 			cond_b++;
 		}
 		c->len++;
 		cond_c++;
 	}
 	while (cond_a < last_a) {
-		co_cond_copy(cond_a, cond_c);
+		co_cond_copy(cond_c, cond_a);
 		cond_a++;
 		c->len++;
 		cond_c++;
 	}
 	while (cond_b < last_b) {
-		co_cond_copy(cond_b, cond_c);
+		co_cond_copy(cond_c, cond_b);
 		cond_b++;
 		c->len++;
 		cond_c++;
@@ -287,10 +287,12 @@ void co_insert(co_t *co, cond_t *cond, hist_t *hist)
 		}
 	} else {
 		// cond is not found, insert it in the co_structure
-		conds = MYmalloc(sizeof(co_cond_t *) * (len+1) );
-		memcpy(conds, co->conds, sizeof(co_cond_t *) * i);
-		memcpy(conds + i + 1, co->conds + i,
-			sizeof(co_cond_t *) * (len-i+1));
+		conds = MYmalloc(sizeof(co_cond_t) * (len+1) );
+		if (len > 0) {
+			memcpy(conds, co->conds, sizeof(co_cond_t) * i);
+			memcpy(conds + i + 1, co->conds + i,
+				sizeof(co_cond_t) * (len-i+1));
+		}
 		conds[i].cond = cond;
 		conds[i].hists_len = 1;
 		conds[i].hists = MYmalloc(sizeof(hist_t *));
@@ -399,15 +401,13 @@ co_t *qco_relation(hist_t *hist)
 {
 	pred_t *pred = hist->pred, *last_pred = hist->pred + hist->pred_n;
 	// Store in tmp the union of qco in hist
-	co_t *tmp = NULL;
+	co_t *tmp = co_new(0);
 	while (pred < last_pred) {
 		co_t *qco_b = g_hash_table_lookup(
 				pred->hist->e->qco, pred->hist);
-		if (tmp != NULL) {
-			qco_b = co_union(tmp, qco_b);
-			co_finalize(tmp);
-		}
-		tmp = qco_b;
+		co_t *old_tmp = tmp;
+		tmp = co_union(qco_b, tmp);
+		co_finalize(old_tmp);
 		pred++;
 	}
 	pred = hist->pred;
@@ -416,10 +416,13 @@ co_t *qco_relation(hist_t *hist)
 			g_hash_table_lookup(pred->hist->e->co, pred->hist),
 			g_hash_table_lookup(pred->cond->co_private, pred->hist)
 		);
-		co_t *co_qco_b = co_union(co_b,
-			g_hash_table_lookup(pred->hist->e->qco, pred->hist));
+		co_t *qco_b =
+			g_hash_table_lookup(pred->hist->e->qco, pred->hist);
+		co_t *co_qco_b = co_union(co_b, qco_b);
 		co_finalize(co_b);
 		co_intersect(co_qco_b, tmp);
+		co_finalize(co_qco_b);
+		pred++;
 	}
 	co_drop_preset(tmp, hist->e);
 	return tmp;
@@ -506,18 +509,22 @@ void unfold ()
 		co->conds[i].hists = (hist_t **)MYmalloc(sizeof(hist_t *));
 		co->conds[i].hists_len = 1;
 		co->conds[i].hists[0] = h0;
+		g_hash_table_insert(co->conds[i].cond->co_private, h0, co_new(0));
 	}
 	g_hash_table_insert(ev->co, h0, co);
+	g_hash_table_insert(ev->qco, h0, co_new(0));
 	
 	// Unfolding:
 	pe_init();
 	pe(h0);
 	hist_t *h = NULL;
-	while ((h = pe_pop()) != NULL) {
+	i = 0;
+	while ((h = pe_pop()) != NULL && i < 1) {
 		if (!cutoff(h)) {
 			add_history(h);
 			pe(h);
 		} else
 			nodelist_push(&cutoff_list, h);
+		i++;
 	} 
 }

@@ -12,7 +12,8 @@ array_t *array_new(int len)
 	array_t *array = (array_t *)MYmalloc(sizeof(array_t));
 	array->len = len;
 	array->count = 0;
-	array->data = MYmalloc(sizeof(void *) * len);
+	if (len>0)
+		array->data = MYmalloc(sizeof(void *) * len);
 	return array;
 }
 

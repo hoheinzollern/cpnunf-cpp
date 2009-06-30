@@ -17,8 +17,8 @@ parikh_vec_t *parikh_new ()
 		exit(1);
 	}
 	vec->last = vec->parikh = MYmalloc(net->numtr * sizeof(parikh_t));
-	vec->size = net->numtr;
-	vec->count = 0;
+	vec->size = vec->count = 0;
+	vec->min = vec->max = 0;
 	return vec;
 }
 
@@ -48,7 +48,7 @@ void parikh_add (parikh_vec_t *vec, unsigned short int tr_num)
 	if (tr_num < vec->last->tr_num)
 	{	/* smaller than last insertion - search downwards */
 		if (tr_num < vec->max)
-			vec->last = vec->parikh + 1;
+			vec->last = vec->parikh - 1;
 		else	
 		{
 			while (tr_num < (--vec->last)->tr_num);
@@ -59,7 +59,7 @@ void parikh_add (parikh_vec_t *vec, unsigned short int tr_num)
 	else if (tr_num > vec->last->tr_num)
 	{	/* larger than last insertion - search upwards */
 		if (tr_num > vec->parikh[vec->size].tr_num)
-			vec->last = vec->parikh + vec->size + 1;
+			vec->last = vec->parikh + vec->size - 1;
 		else	
 		{
 			while (tr_num > (++vec->last)->tr_num);

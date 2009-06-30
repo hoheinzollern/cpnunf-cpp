@@ -218,11 +218,11 @@ typedef struct co_t {
  */
 typedef struct net_t
 {
-	place_t *places;	/* pointer to first place		*/
-	trans_t *transitions;	/* pointer to first transition		*/ 
-	int numpl, numtr;	/* number of places/transitions in net	*/
-	int maxpre, maxpost;	/* maximal size of a t-pre/postset	*/
-	int maxra;		/* maximum readarcs of transitions      */
+	place_t *places;	/** pointer to first place		*/
+	trans_t *transitions;	/** pointer to first transition		*/
+	int numpl, numtr;	/** number of places/transitions in net	*/
+	int maxpre, maxpost;	/** maximal size of a t-pre/postset	*/
+	int maxra;		/** maximum readarcs of transitions      */
 } net_t;
 
 /**
