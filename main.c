@@ -32,30 +32,17 @@ void usage(char *myname)
  */
 int main (int argc, char **argv)
 {
-	int	 i;
-	char    *llnet = NULL;
-	char    **dptr = &llnet;
-	char    *stoptr_name = NULL;
-	char    COMPRESS = 1;
+	if (argc == 2) {
+		char    *llnet = argv[1];
+		char    *stoptr_name = NULL;
+		net = read_pep_net(llnet);
+		nc_static_checks(net,stoptr_name);
 
-	for (i = 1; i < argc; i++)
-		if (!strcmp(argv[i],"-f"))
-			COMPRESS = 0;
-		else
-		{
-			if (!dptr) usage(argv[0]);
-			*dptr = argv[i];
-			dptr = NULL;
-		}
+		unfold();
 
-	if (!llnet) usage(argv[0]);
-
-	net = read_pep_net(llnet);
-	nc_static_checks(net,stoptr_name);
-
-	unfold();
-
-	write_dot_output(unf,cutoff_list);
+		write_dot_output(unf,cutoff_list);
+	} else
+		usage(argv[0]);
 
 	return exitcode;
 }

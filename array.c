@@ -1,4 +1,5 @@
 #include "array.h"
+#include "glib.h"
 #include "common.h"
 #include <string.h>
 
@@ -14,13 +15,16 @@ array_t *array_new(int len)
 	array->count = 0;
 	if (len>0)
 		array->data = MYmalloc(sizeof(void *) * len);
+	else
+		array->data = NULL;
 	return array;
 }
 
 /// Frees an entire array structure
 void array_delete(array_t *array)
 {
-	free(array->data);
+	if (array->len > 0)
+		free(array->data);
 	free(array);
 }
 
@@ -28,12 +32,18 @@ void array_delete(array_t *array)
 void array_append(array_t *array, void *val)
 {
 	if (array->count == array->len) {
-		int new_len = array->len * 2;
-		void *new_data = MYmalloc(sizeof(void *) * new_len);
-		memcpy(new_data, array->data, sizeof(void *) * array->len);
-		free (array->data);
-		array->data = new_data;
-		array->len = new_len;
+		if (array->len==0) {
+			array->data = MYmalloc(sizeof(void *) * 2);
+			array->len = 2;
+		} else {
+			int new_len = array->len * 2;
+			void *new_data = MYmalloc(sizeof(void *) * new_len);
+			memcpy(new_data, array->data,
+			       sizeof(void *) * array->len);
+			free (array->data);
+			array->data = new_data;
+			array->len = new_len;
+		}
 	}
 	array->data[array->count++] = val;
 }
@@ -61,6 +71,7 @@ int array_binary_search(array_t *array, void *val)
 /// Given that the array is ordered, insert val in the correct place
 void array_insert_ordered(array_t *array, void *val)
 {
+	g_assert(val!=NULL);
 	array_append(array, val);
 	int i = 0;
 	while (i<array->count && array->data[i]<val)
@@ -91,4 +102,13 @@ void array_sort(array_t *array)
 		}
 		array_get(array, j+1) = tmp;
 	}
+}
+
+UNFbool array_ordered(array_t *array)
+{
+	UNFbool ordered = UNF_TRUE;
+	int i;
+	for (i=0; i<array->count-1 && ordered; i++)
+		ordered = array_get(array, i) <= array_get(array, i+1);
+	return ordered;
 }

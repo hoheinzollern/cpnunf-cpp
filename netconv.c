@@ -174,8 +174,8 @@ cond_t *nc_cond_new(place_t *pl, event_t *ev)
 	cond->pre_ev = ev;
 	cond->origin = pl;
 	
-	cond->postset = array_new(1);
-	cond->readarcs = array_new(1);
+	cond->postset = array_new(0);
+	cond->readarcs = array_new(0);
 	
 	cond->co_private = g_hash_table_new(NULL, NULL);
 	
@@ -203,6 +203,7 @@ event_t *nc_event_new(trans_t *tr, array_t *pre, array_t *read)
 		ps = ps->next;
 	}
 	array_sort(post);
+	g_assert(array_ordered(post));
 	
 	ev->co = g_hash_table_new(NULL, NULL);
 	ev->qco = g_hash_table_new(NULL, NULL);
@@ -216,12 +217,12 @@ event_t *nc_event_new(trans_t *tr, array_t *pre, array_t *read)
  */
 void nc_add_event(event_t *ev)
 {
-	g_hash_table_insert(unf->conditions, ev, ev);
+	g_hash_table_insert(unf->events, ev, ev);
 	int size = ev->postset->len, i;
 	for (i=0; i<size; i++)
 	{
 		cond_t *cond = array_get(ev->postset, i);
-		g_hash_table_insert(unf->events, cond, cond);
+		g_hash_table_insert(unf->conditions, cond, cond);
 	}
 	
 	// Update reverse link side

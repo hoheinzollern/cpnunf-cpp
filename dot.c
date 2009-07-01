@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <glib.h>
 
@@ -23,8 +24,9 @@ void* reverse_list (void *ptr)
 
 void print_event(event_t *ev)
 {
-	printf("  e%d [label=\"%s (e%d)\" shape=box];\n",
-		ev->num,ev->origin->name,ev->num);
+	if (ev->num != -1)
+		printf("  e%d [label=\"e%d (%s)\" shape=box];\n",
+			ev->num,ev->num,ev->origin->name);
 }
 
 void print_readarcs(cond_t *co)
@@ -34,7 +36,7 @@ void print_readarcs(cond_t *co)
 	int i;
 	for (i=0; i<array->len; i++) {
 		ev = (event_t *)array_get(array, i);
-		printf("  c%d -> e%d [dir=none];\n", co->num, ev->num);
+		printf("  b%d -> e%d [dir=none];\n", co->num, ev->num);
 	}
 }
 
@@ -43,23 +45,24 @@ void print_postset(cond_t *co)
 	array_t *array = co->postset;
 	event_t *ev = NULL;
 	int i;
-	for (i=0; i<array->len; i++) {
+	for (i=0; i<array->count; i++) {
 		ev = (event_t *)array_get(array, i);
-		printf("  e%d -> c%d;\n", ev->num, co->num);
+		printf("  b%d -> e%d;\n", co->num, ev->num);
 	}
 }
 
 void print_condition(cond_t *co)
 {
-	printf("  c%d [label=\"%s (c%d)\" shape=circle];\n",
-			co->num,co->origin->name,co->num);
+	printf("  b%d [label=\"b%d (%s)\" shape=circle];\n",
+			co->num,co->num,co->origin->name);
+	if (co->pre_ev->num != -1)
+		printf("  e%d -> b%d;\n", co->pre_ev->num, co->num);
 	print_postset(co);
 	print_readarcs(co);
 }
 
 void write_dot_output (unf_t *u, nodelist_t *cutoffs)
 {
-	event_t *ev;
 	nodelist_t *list;
 
 	GHashTableIter iter;
@@ -79,8 +82,12 @@ void write_dot_output (unf_t *u, nodelist_t *cutoffs)
 	for (list = cutoffs; list; list = list->next)
 	{
 		num_cutoffs++;
-		printf("  e%d [style=dashed];\n",(ev = list->node)->mark);
+		hist_t *h = ((hist_t *)list->node);
+		fprintf(stderr, "cutoff history for e%d (%s);\n",
+			h->e->num, h->e->origin->name);
 	}
 
 	printf("}\n");
+
+	fprintf(stderr, "%d cutoff histories\n", num_cutoffs);
 }

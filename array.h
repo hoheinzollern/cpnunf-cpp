@@ -27,6 +27,7 @@ extern int array_binary_search(array_t *array, void *val);
  */
 extern void array_insert_ordered(array_t *array, void *val);
 extern void array_sort(array_t *array);
+extern UNFbool array_ordered(array_t *array);
 #define array_get(array, i) ((array)->data[(i)])
 
 #endif

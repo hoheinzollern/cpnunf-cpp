@@ -486,7 +486,10 @@ void add_history(hist_t *hist)
 UNFbool cutoff(hist_t *h1)
 {
 	hist_t *h2 = g_hash_table_lookup(unf->markings, h1->parikh);
-	return (h2 != NULL && pe_compare(h1, h2) > 0);
+	if (h2 != NULL)
+		return (pe_compare(h1, h2) <= 0);
+	else
+		return UNF_FALSE;
 }
 
 /**
@@ -511,6 +514,7 @@ void unfold ()
 	while (ps) {
 		cond_t *cond = nc_cond_new(ps->node, ev);
 		array_append(post, cond);
+		g_hash_table_insert(unf->conditions, cond, cond);
 		ps = ps->next;
 	}
 	array_sort(post);
@@ -544,13 +548,11 @@ void unfold ()
 	pe_init();
 	pe(h0);
 	hist_t *h = NULL;
-	i = 0;
-	while ((h = pe_pop()) != NULL && i < 1) {
+	while ((h = pe_pop()) != NULL) {
 		if (!cutoff(h)) {
 			add_history(h);
 			pe(h);
 		} else
 			nodelist_push(&cutoff_list, h);
-		i++;
 	} 
 }
