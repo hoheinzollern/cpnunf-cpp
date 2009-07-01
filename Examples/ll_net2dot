@@ -54,7 +54,7 @@ if (ll_net.pop(0) == "PEP" and ll_net.pop(0) == "PetriBox" and
         # Print read arcs
         while True:
             tokens = line.split("<")
-            print "\t\"%s\" -> \"%s\" [dir=none];" % (transitions[tokens[0]],places[tokens[1]])
+            print "\t\"%s\" -> \"%s\" [dir=none];" % (places[tokens[1]],transitions[tokens[0]])
             line = ll_net.pop(0)
     except:
         print "}"

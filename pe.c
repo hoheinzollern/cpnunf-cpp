@@ -113,7 +113,7 @@ array_t *im_post_context(event_t *e)
  */
 array_t *place_postset(array_t *S)
 {
-	array_t *T = array_new(1);
+	array_t *T = array_new(0);
 	int i;
 	for (i = 0; i < S->count; i++) {
 		nodelist_t *post = ((place_t *)array_get(S, i))->postset;
@@ -121,11 +121,11 @@ array_t *place_postset(array_t *S)
 			array_insert_ordered(T, post->node);
 			post = post->next;
 		}
-		nodelist_t *cont = ((place_t *)array_get(S, i))->readarcs;
+		/*nodelist_t *cont = ((place_t *)array_get(S, i))->readarcs;
 		while (cont != NULL) {
 			array_insert_ordered(T, cont->node);
 			cont = cont->next;
-		}
+		}*/
 	}
 	return T;
 }
@@ -146,70 +146,67 @@ array_t *place_postset(array_t *S)
  */
 co_t *test_trans(trans_t *tr, co_t *co, int *n_causes)
 {
-	if (tr!=NULL) {
-		check_co(co);
-		nodelist_t *pre = tr->preset;
-		nodelist_t *context = tr->readarcs;
-		UNFbool good = UNF_TRUE;
-		co_t *pair_co = co_new(tr->preset_size + tr->readarc_size);
-		int count = 0;
-		while (pre != NULL && good == UNF_TRUE) {
-			// TODO: optimize this part: sets of places in the
-			// original net should be kept ordered.
-			int i;
-			// try to find the place of tr's preset in the
-			// co-conditions'image
-			for (i=0; i<co->len &&
-			     co->conds[i].cond->origin!=(place_t *)pre->node;
-			     i++);
-			if (i>=co->len)
-				good = UNF_FALSE;
-			else {
-				// add the found conditions
-				pair_co->conds[count].cond = co->conds[i].cond;
-				pair_co->conds[count].hists = co->conds[i].hists;
-				pair_co->conds[count].hists_len =
-						co->conds[i].hists_len;
-				count++;
-			}
-			pre = pre->next;
-		}
-		*n_causes = count;
-		while (context != NULL && good == UNF_TRUE
-		       && count < pair_co->len) {
-			// TODO: optimize this part: sets of places in the
-			// original net should be kept ordered.
-			int i;
-			// try to find the place of tr's context in the
-			// co-conditions'image
-			for (i=0; i<co->len &&
-			     co->conds[i].cond->origin!=(place_t *)context->node;
-			     i++);
-			if (i>=co->len)
-				good = UNF_FALSE;
-			else {
-				// add the found conditions
-				pair_co->conds[count].cond = co->conds[i].cond;
-				pair_co->conds[count].hists = co->conds[i].hists;
-				pair_co->conds[count].hists_len =
-						co->conds[i].hists_len;
-			}
+	check_co(co);
+	nodelist_t *pre = tr->preset;
+	nodelist_t *context = tr->readarcs;
+	UNFbool good = UNF_TRUE;
+	co_t *pair_co = co_new(tr->preset_size + tr->readarc_size);
+	int count = 0;
+	while (pre != NULL && good == UNF_TRUE) {
+		// TODO: optimize this part: sets of places in the
+		// original net should be kept ordered.
+		int i;
+		// try to find the place of tr's preset in the
+		// co-conditions'image
+		for (i=0; i<co->len &&
+		     co->conds[i].cond->origin!=(place_t *)pre->node;
+		     i++);
+		if (i>=co->len)
+			good = UNF_FALSE;
+		else {
+			// add the found conditions
+			pair_co->conds[count].cond = co->conds[i].cond;
+			pair_co->conds[count].hists = co->conds[i].hists;
+			pair_co->conds[count].hists_len =
+					co->conds[i].hists_len;
 			count++;
-			context = context->next;
 		}
-		pair_co->len = count;
-		check_co(pair_co);
-		if (good) {
-			return pair_co;
-		} else {
-			// don't call co_finalize as pair_co shares histories
-			// with co
-			free(pair_co->conds);
-			free(pair_co);
-			return NULL;
+		pre = pre->next;
+	}
+	*n_causes = count;
+	while (context != NULL && good == UNF_TRUE
+	       && count < pair_co->len) {
+		// TODO: optimize this part: sets of places in the
+		// original net should be kept ordered.
+		int i;
+		// try to find the place of tr's context in the
+		// co-conditions'image
+		for (i=0; i<co->len &&
+		     co->conds[i].cond->origin!=(place_t *)context->node;
+		     i++);
+		if (i>=co->len)
+			good = UNF_FALSE;
+		else {
+			// add the found conditions
+			pair_co->conds[count].cond = co->conds[i].cond;
+			pair_co->conds[count].hists = co->conds[i].hists;
+			pair_co->conds[count].hists_len =
+					co->conds[i].hists_len;
 		}
-	} else
+		count++;
+		context = context->next;
+	}
+	pair_co->len = count;
+	check_co(pair_co);
+	if (good) {
+		return pair_co;
+	} else {
+		// don't call co_finalize as pair_co shares histories
+		// with co
+		free(pair_co->conds);
+		free(pair_co);
 		return NULL;
+	}
 }
 
 /**

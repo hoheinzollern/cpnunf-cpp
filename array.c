@@ -71,7 +71,9 @@ int array_binary_search(array_t *array, void *val)
 /// Given that the array is ordered, insert val in the correct place
 void array_insert_ordered(array_t *array, void *val)
 {
+#ifdef __DEBUG__
 	g_assert(val!=NULL);
+#endif
 	array_append(array, val);
 	int i = 0;
 	while (i<array->count && array->data[i]<val)

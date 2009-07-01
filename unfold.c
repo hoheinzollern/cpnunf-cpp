@@ -170,8 +170,10 @@ void co_drop_preset(co_t *co, event_t *ev)
 			cond++;
 		}
 	}
+#ifdef __DEBUG__
 	for (i = 0; i < co->len; i++)
 		g_assert(co->conds[i].hists!=NULL);
+#endif
 }
 
 /**
@@ -182,14 +184,14 @@ void co_cond_copy(co_cond_t *dst, co_cond_t *src)
 	check_co_cond(src);
 	dst->cond = src->cond;
 	dst->hists_len = src->hists_len;
-	if (src->hists_len > 0) {
-		dst->hists = MYmalloc(sizeof(hist_t *) * dst->hists_len);
-		memcpy(dst->hists, src->hists, sizeof(hist_t *) * dst->hists_len);
-	} else {
-		dst->hists = NULL;
-		g_assert(0);
-	}
+#ifdef __DEBUG__
+	g_assert(src->hists_len > 0);
+#endif
+	dst->hists = MYmalloc(sizeof(hist_t *) * dst->hists_len);
+	memcpy(dst->hists, src->hists, sizeof(hist_t *) * dst->hists_len);
+#ifdef __DEBUG__
 	check_co_cond(src);
+#endif
 }
 
 /**
@@ -239,7 +241,9 @@ co_t *co_union(co_t *a, co_t *b)
 	co_cond_t *last_a = a->conds + a->len,
 		  *last_b = b->conds + b->len;
 	while (cond_a < last_a && cond_b < last_b) {
+#ifdef __DEBUG__
 		g_assert(a->len != 0);
+#endif
 		if (cond_a->cond < cond_b->cond) {
 			co_cond_copy(cond_c, cond_a);
 			cond_a++;

@@ -204,7 +204,9 @@ event_t *nc_event_new(trans_t *tr, array_t *pre, array_t *read)
 		ps = ps->next;
 	}
 	array_sort(post);
+#ifdef __DEBUG__
 	g_assert(array_ordered(post));
+#endif
 	
 	ev->co = g_hash_table_new(NULL, NULL);
 	ev->qco = g_hash_table_new(NULL, NULL);
