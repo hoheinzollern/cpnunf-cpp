@@ -24,7 +24,7 @@ void* reverse_list (void *ptr)
 void print_event(event_t *ev)
 {
 	printf("  e%d [label=\"%s (e%d)\" shape=box];\n",
-		ev->mark,ev->origin->name,ev->mark);
+		ev->num,ev->origin->name,ev->num);
 }
 
 void print_readarcs(cond_t *co)
@@ -34,7 +34,7 @@ void print_readarcs(cond_t *co)
 	int i;
 	for (i=0; i<array->len; i++) {
 		ev = (event_t *)array_get(array, i);
-		printf("  c%d -> e%d [dir=none];\n", co->num, ev->mark);
+		printf("  c%d -> e%d [dir=none];\n", co->num, ev->num);
 	}
 }
 
@@ -45,7 +45,7 @@ void print_postset(cond_t *co)
 	int i;
 	for (i=0; i<array->len; i++) {
 		ev = (event_t *)array_get(array, i);
-		printf("  e%d -> c%d;\n", ev->mark, co->num);
+		printf("  e%d -> c%d;\n", ev->num, co->num);
 	}
 }
 

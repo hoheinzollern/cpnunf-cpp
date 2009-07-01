@@ -1,0 +1,60 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+import sys
+
+if (len(sys.argv)!=2):
+    print "Reads a PEP LL-NET and converts it to a graphviz graph\n"
+    print "Usage:\n\t%s net.ll_net | dot -Tpdf > net.pdf" % sys.argv[0]
+    sys.exit(0)
+
+ll_net = open(sys.argv[1]).read().splitlines()
+
+places = {}
+transitions = {}
+if (ll_net.pop(0) == "PEP" and ll_net.pop(0) == "PetriBox" and
+    ll_net.pop(0) == "FORMAT_N2" and ll_net.pop(0) == "PL"):
+    try:
+        print "digraph test {"
+        line = ll_net.pop(0)
+        # Print places
+        while line != "TR":
+            tokens = line.split("\"")
+            if tokens[2]=="M1":
+                print ("\t\"%s\" [fillcolor=gray, style=\"filled\"," + 
+                    "label=\"%s\" shape=circle];") % (tokens[1],tokens[1])
+            else:
+                print "\t\"%s\" [label=\"%s\" shape=circle];" % (tokens[1],tokens[1])
+            places[tokens[0]] = tokens[1]
+            line = ll_net.pop(0)
+        line = ll_net.pop(0)
+        
+        # Print transitions
+        while line != "TP":
+            tokens = line.split("\"")
+            print "\t\"%s\" [label=\"%s\" shape=box];" % (tokens[1],tokens[1])
+            transitions[tokens[0]] = tokens[1]
+            line = ll_net.pop(0)
+        line = ll_net.pop(0)
+        
+        # Print consume arcs
+        while line != "PT":
+            tokens = line.split("<")
+            print "\t\"%s\" -> \"%s\";" % (transitions[tokens[0]],places[tokens[1]])
+            line = ll_net.pop(0)
+        line = ll_net.pop(0)
+        
+        # Print produce arcs
+        while line != "RA":
+            tokens = line.split(">")
+            print "\t\"%s\" -> \"%s\";" % (places[tokens[0]],transitions[tokens[1]])
+            line = ll_net.pop(0)
+        line = ll_net.pop(0)
+        
+        # Print read arcs
+        while True:
+            tokens = line.split("<")
+            print "\t\"%s\" -> \"%s\" [dir=none];" % (transitions[tokens[0]],places[tokens[1]])
+            line = ll_net.pop(0)
+    except:
+        print "}"

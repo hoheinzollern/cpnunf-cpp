@@ -5,6 +5,7 @@
 #include "pe.h"
 #include "marking.h"
 #include "unfold.h"
+#include "test.h"
 
 net_t *net;	/* stores the net	*/
 unf_t *unf;	/* stores the unfolding */
@@ -86,13 +87,13 @@ void hist_intersect(hist_t **a, int len_a, hist_t ***b, int *len_b)
 	while (a < last_a && *b < last_b) {
 		if (*a == **b) {
 			cur_b = a;
-			a++; b++; cur_b++; (*len_b)++;
-		} else if (*a < **b) a++;
-		else b++;
+			++a; ++b; ++cur_b; ++(*len_b);
+		} else if (*a < **b) ++a;
+		else ++b;
 	}
 	while (cur_b < last_b) {
 		*cur_b = NULL;
-		cur_b++;
+		++cur_b;
 	}
 	// TODO: strip the length of the array to the used size
 }
@@ -112,15 +113,23 @@ void co_intersect(co_t *a, co_t *b)
 		if (cond_a->cond == cond_b->cond) {
 			// a == b is a condition present in both co-arrays
 			cond_c->cond = cond_a->cond;
-			if (cond_b != cond_c)
+			/*if (cond_b != cond_c && cond_c->hists != NULL) {
 				free(cond_c->hists);
+				cond_b->hists = NULL;
+			} memory leaks?*/
 			
 			// so find the intersection of both histories
 			hist_intersect(cond_a->hists, cond_a->hists_len,
 				       &(cond_b->hists), &(cond_b->hists_len));
-			cond_c->hists_len = cond_b->hists_len;
-			cond_c->hists = cond_b->hists;
-			cond_a++; cond_b++; cond_c++; len_c++;
+			// if there are histories in the intersection copy them
+			if (cond_b->hists_len > 0) {
+				cond_c->hists_len = cond_b->hists_len;
+				cond_c->hists = cond_b->hists;
+				cond_a++; cond_b++; cond_c++; len_c++;
+			} else {
+				cond_a++;
+				cond_b++;
+			}
 		} else if (cond_a->cond < cond_b->cond) {
 			cond_a++;
 		} else {
@@ -128,16 +137,17 @@ void co_intersect(co_t *a, co_t *b)
 			cond_b++;
 		}
 	}
-	while (cond_c < lastcond_b) {
-		cond_c->cond = NULL;
-		cond_c->hists_len = 0;
-		if (cond_c->hists != NULL)
+	while (cond_b < lastcond_b) {
+		cond_b->cond = NULL;
+		cond_b->hists_len = 0;
+		if (cond_b->hists != NULL)
 			free(cond_c->hists);
-		cond_c->hists = NULL;
-		cond_c++;
+		cond_b->hists = NULL;
+		cond_b++;
 	}
 	b->len = len_c;
 	// TODO: strip the length of the array to the used size
+	check_co(b);
 }
 
 /**
@@ -169,6 +179,7 @@ void co_drop_preset(co_t *co, event_t *ev)
  */
 void co_cond_copy(co_cond_t *dst, co_cond_t *src)
 {
+	check_co_cond(src);
 	dst->cond = src->cond;
 	dst->hists_len = src->hists_len;
 	if (src->hists_len > 0) {
@@ -176,7 +187,9 @@ void co_cond_copy(co_cond_t *dst, co_cond_t *src)
 		memcpy(dst->hists, src->hists, sizeof(hist_t *) * dst->hists_len);
 	} else {
 		dst->hists = NULL;
+		g_assert(0);
 	}
+	check_co_cond(src);
 }
 
 /**
@@ -217,6 +230,8 @@ void hist_union(hist_t **h1, int len_h1, hist_t **h2, int len_h2,
  */
 co_t *co_union(co_t *a, co_t *b)
 {
+	check_co(a);
+	check_co(b);
 	co_t *c = co_new(a->len + b->len);
 	c->len = 0;
 	
@@ -224,6 +239,7 @@ co_t *co_union(co_t *a, co_t *b)
 	co_cond_t *last_a = a->conds + a->len,
 		  *last_b = b->conds + b->len;
 	while (cond_a < last_a && cond_b < last_b) {
+		g_assert(a->len != 0);
 		if (cond_a->cond < cond_b->cond) {
 			co_cond_copy(cond_c, cond_a);
 			cond_a++;
@@ -232,24 +248,28 @@ co_t *co_union(co_t *a, co_t *b)
 			hist_union(cond_a->hists, cond_a->hists_len,
 				   cond_b->hists, cond_b->hists_len,
 				   &(cond_c->hists), &(cond_c->hists_len));
+			cond_a++; cond_b++;
 		} else {
 			co_cond_copy(cond_c, cond_b);
 			cond_b++;
 		}
 		c->len++;
 		cond_c++;
+		check_co(c);
 	}
 	while (cond_a < last_a) {
 		co_cond_copy(cond_c, cond_a);
 		cond_a++;
 		c->len++;
 		cond_c++;
+		check_co(c);
 	}
-	while (cond_b < last_b) {
+	while (cond_b < last_b && b->len > 0) {
 		co_cond_copy(cond_c, cond_b);
 		cond_b++;
 		c->len++;
 		cond_c++;
+		check_co(c);
 	}
 	
 	return c;
@@ -365,8 +385,11 @@ co_t *co_relation(hist_t *hist)
 		pred++;
 	}
 	co_drop_preset(tmp, hist->e);
+	check_co(tmp);
 	co_t *co_post = co_postset_e(hist);
+	check_co(co_post);
 	co_t *result = co_union(tmp, co_post);
+	check_co(result);
 	co_finalize(tmp);
 	co_finalize(co_post);
 	
@@ -447,6 +470,9 @@ void add_history(hist_t *hist)
 	
 	g_hash_table_insert(hist->e->co, hist, co_rel);
 	g_hash_table_insert(hist->e->qco, hist, qco_rel);
+
+	check_co(co_rel);
+	check_co(qco_rel);
 	
 	// Adds the marking of hist to the unfolding
 	g_hash_table_insert(unf->markings, hist->parikh, hist);

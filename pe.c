@@ -147,6 +147,7 @@ array_t *place_postset(array_t *S)
 co_t *test_trans(trans_t *tr, co_t *co, int *n_causes)
 {
 	if (tr!=NULL) {
+		check_co(co);
 		nodelist_t *pre = tr->preset;
 		nodelist_t *context = tr->readarcs;
 		UNFbool good = UNF_TRUE;
@@ -165,8 +166,10 @@ co_t *test_trans(trans_t *tr, co_t *co, int *n_causes)
 				good = UNF_FALSE;
 			else {
 				// add the found conditions
-				memcpy(pair_co->conds + count, co->conds + i,
-				       sizeof(co_cond_t));
+				pair_co->conds[count].cond = co->conds[i].cond;
+				pair_co->conds[count].hists = co->conds[i].hists;
+				pair_co->conds[count].hists_len =
+						co->conds[i].hists_len;
 				count++;
 			}
 			pre = pre->next;
@@ -186,13 +189,16 @@ co_t *test_trans(trans_t *tr, co_t *co, int *n_causes)
 				good = UNF_FALSE;
 			else {
 				// add the found conditions
-				memcpy(pair_co->conds + count, co->conds + i,
-				       sizeof(co_cond_t));
+				pair_co->conds[count].cond = co->conds[i].cond;
+				pair_co->conds[count].hists = co->conds[i].hists;
+				pair_co->conds[count].hists_len =
+						co->conds[i].hists_len;
 			}
 			count++;
 			context = context->next;
 		}
 		pair_co->len = count;
+		check_co(pair_co);
 		if (good) {
 			return pair_co;
 		} else {
@@ -332,7 +338,7 @@ void find_pred(trans_t *t, co_t *B, int n_causes, pred_t *preds, int depth,
 		int i;
 		co_cond_t *cond = B->conds + depth;
 		preds[*pred_n].cond = cond->cond;
-		if (n_causes < depth) {
+		if (depth < n_causes) {
 			SET_FLAG(preds[*pred_n].flags, HIST_C);
 			// Chose a causal history for the current condition,
 			// check if it is pairwise concurrent with all other
@@ -345,10 +351,10 @@ void find_pred(trans_t *t, co_t *B, int n_causes, pred_t *preds, int depth,
 				preds[*pred_n].hist = cond->hists[i];
 				// all chosen predecessors are pairwise
 				// concurrent, go on.
-				++*pred_n;
+				++(*pred_n);
 				find_pred(t, B, n_causes, preds, depth + 1,
 					  pred_n);
-				--*pred_n;
+				--(*pred_n);
 			}
 			//			OR
 			// Chose each concurrent subset of read histories and do
@@ -360,10 +366,10 @@ void find_pred(trans_t *t, co_t *B, int n_causes, pred_t *preds, int depth,
 				// chose this history Hi as a pivot and then
 				// a subset of H' s.t. H' < Hi and H' is readH
 				preds[*pred_n].hist = cond->hists[i];
-				++*pred_n;
+				++(*pred_n);
 				read_hist_subset_rec(t, B, n_causes, preds,
 					depth, pred_n, i-1);
-				--*pred_n;
+				--(*pred_n);
 			}
 		} else {
 			SET_FLAG(preds[*pred_n].flags, HIST_R);
@@ -379,10 +385,10 @@ void find_pred(trans_t *t, co_t *B, int n_causes, pred_t *preds, int depth,
 					{
 					// all chosen predecessors are pairwise
 					// concurrent, go on.
-					++*pred_n;
+					++(*pred_n);
 					find_pred(t, B, n_causes, preds,
 						  depth + 1, pred_n);
-					--*pred_n;
+					--(*pred_n);
 				}
 			}
 		}
@@ -448,6 +454,7 @@ void pe (hist_t *h)
 	int i;
 	for (i = 0; i<T->count; i++) {
 		int n_causes;
+		check_co(co);
 		co_t *B = test_trans(array_get(T, i), co, &n_causes);
 		if (B != NULL) {
 			// *t U _t_ is a subset of im(co)
