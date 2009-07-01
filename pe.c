@@ -142,7 +142,7 @@ array_t *place_postset(array_t *S)
  * @return the set of conditions if they all have an image in the preset, NULL
  * 	otherwise. Note that this is a subset of co and shares memory with it:
  * 	do not destroy it's histories!
- * 	Note that this structure is NOT ordered on conditions!
+ * 	Note that this structure is not ordered on conditions!
  */
 co_t *test_trans(trans_t *tr, co_t *co, int *n_causes)
 {
@@ -307,11 +307,12 @@ void pred_sort(pred_t *pred, int pred_n)
 	for (i=1; i<pred_n; i++) {
 		j = i-1;
 		pred_t tmp = pred[i];
+		memcpy(&tmp, pred + i, sizeof(pred_t));
 		while (j>=0 && pred[j].cond > tmp.cond) {
-			pred[j+1] = pred[j];
+			memcpy(pred + j + 1, pred + j, sizeof(pred_t));
 			--j;
 		}
-		pred[j+1] = tmp;
+		memcpy(pred + j + 1, &tmp, sizeof(pred_t));
 		// TODO: check if structure assignment makes a valid copy of
 		// the entire structure.
 	}
@@ -393,9 +394,9 @@ void find_pred(trans_t *t, co_t *B, int n_causes, pred_t *preds, int depth,
 			}
 		}
 	} else {
-		// we found a set of concurrent predecessors for H, add it to pe;
-		// find if there is already the event in the unfolding; if not,
-		// create it.
+		// we found a set of concurrent predecessors for H, add it to
+		// pe; find if there is already the event in the unfolding whose
+		// image in the original net is t; if not, create it.
 		array_t *events = NULL;
 		if (n_causes>0)
 			events = preds->cond->postset;
@@ -426,7 +427,7 @@ void find_pred(trans_t *t, co_t *B, int n_causes, pred_t *preds, int depth,
 		hist->flags = 0;
 		hist->pred = MYmalloc(sizeof(pred_t) * *pred_n);
 		hist->pred_n = *pred_n;
-		memcpy(hist->pred, preds, *pred_n * sizeof(pred_t));
+		memcpy(hist->pred, preds, sizeof(pred_t) * *pred_n);
 		pred_sort(hist->pred, hist->pred_n);
 		size_mark(hist);
 		// Add the newly created history to the list of possible
@@ -460,6 +461,8 @@ void pe (hist_t *h)
 			// *t U _t_ is a subset of im(co)
 			check_co(B);
 			find_pred(array_get(T, i), B, n_causes, NULL, 0, NULL);
+			free(B->conds);
+			free(B);
 		}
 	}
 }

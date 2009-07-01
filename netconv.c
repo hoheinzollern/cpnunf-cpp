@@ -126,6 +126,7 @@ void nc_compute_sizes (net_t *net)
 		if (net->maxpost < k) net->maxpost = k;
 
 		for (k = 0, list = tr->readarcs; list; k++, list = list->next);
+		tr->readarc_size = k;
 		if (net->maxra < k) net->maxra = k;
 	}
 }

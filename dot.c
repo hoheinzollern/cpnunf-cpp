@@ -34,7 +34,7 @@ void print_readarcs(cond_t *co)
 	array_t *array = co->readarcs;
 	event_t *ev = NULL;
 	int i;
-	for (i=0; i<array->len; i++) {
+	for (i=0; i<array->count; i++) {
 		ev = (event_t *)array_get(array, i);
 		printf("  b%d -> e%d [dir=none];\n", co->num, ev->num);
 	}

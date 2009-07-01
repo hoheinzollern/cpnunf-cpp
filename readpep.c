@@ -553,13 +553,6 @@ int insert_ra()
 	if (!pl || (pl > AnzPlNamen) || !PlArray[pl] )
 		nc_error("readarc: incorrect place identifier");
 
-	/* for now, I'm going to cheat and treat read arcs as
-	   conventional arcs in both directions... */
-	nc_create_arc(&(PlArray[pl]->postset),&(TrArray[tr]->preset),
-			  PlArray[pl],TrArray[tr]);
-	nc_create_arc(&(TrArray[tr]->postset),&(PlArray[pl]->preset),
-			  TrArray[tr],PlArray[pl]);
-
 	nc_create_arc(&(TrArray[tr]->readarcs),&(PlArray[pl]->readarcs),
 			  TrArray[tr],PlArray[pl]);
 	return 0;

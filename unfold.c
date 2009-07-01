@@ -487,7 +487,7 @@ UNFbool cutoff(hist_t *h1)
 {
 	hist_t *h2 = g_hash_table_lookup(unf->markings, h1->parikh);
 	if (h2 != NULL)
-		return (pe_compare(h1, h2) <= 0);
+		return (pe_compare(h1, h2) < 0);
 	else
 		return UNF_FALSE;
 }
