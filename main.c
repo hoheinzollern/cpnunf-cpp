@@ -5,6 +5,7 @@
 #include "common.h"
 #include "netconv.h"
 #include "unfold.h"
+#include "output.h"
 
 /*****************************************************************************/
 
@@ -12,7 +13,11 @@ void usage(char *myname)
 {
 	fprintf(stderr,
 		"Unfolder -- unfolder for nets with read arcs\n\n"
-		"Usage: unfolder <LLnetfile>\n\n"
+		"Usage: unfolder -[lLd] <LLnetfile>\n"
+		"\t-l outputs the net in ll_net format\n"
+		"\t-L outputs the net in ll_net format with the extension of"
+		"histories\n"
+		"\t-d outputs the net in dot file format [default] \n\n"
 
 	"Unfolder is a spin-off from Mole that works for nets with read arcs.\n"
 	"The output is a dot-compatible graph of the result.\n\n"
@@ -32,15 +37,23 @@ void usage(char *myname)
  */
 int main (int argc, char **argv)
 {
-	if (argc == 2) {
-		char    *llnet = argv[1];
+	if (argc == 2 || argc == 3) {
+		char    *llnet = argv[argc-1];
 		char    *stoptr_name = NULL;
 		net = read_pep_net(llnet);
 		nc_static_checks(net,stoptr_name);
 
 		unfold();
 
-		write_dot_output(unf,cutoff_list);
+		if (argc == 3) {
+			if (strcmp(argv[1], "-l")==0)
+				write_ll_net(unf, cutoff_list, UNF_FALSE);
+			else if (strcmp(argv[1], "-L")==0)
+				write_ll_net(unf, cutoff_list, UNF_TRUE);
+			else if (strcmp(argv[1], "-d")==0)
+				write_dot_output(unf, cutoff_list);
+		} else
+			write_dot_output(unf, cutoff_list);
 	} else
 		usage(argv[0]);
 

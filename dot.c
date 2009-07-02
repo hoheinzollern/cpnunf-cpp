@@ -6,30 +6,16 @@
 #include "common.h"
 #include "netconv.h"
 #include "unfold.h"
+#include "output.h"
 
-void* reverse_list (void *ptr)
-{
-	place_t *newlist = NULL, *list = ptr;
-
-	while (list)
-	{
-		place_t *tmp = list->next;
-		list->next = newlist;
-		newlist = list;
-		list = tmp;
-	}
-
-	return newlist;
-}
-
-void print_event(event_t *ev)
+void print_dot_event(event_t *ev)
 {
 	if (ev->num != -1)
 		printf("  e%d [label=\"e%d (%s)\" shape=box];\n",
 			ev->num,ev->num,ev->origin->name);
 }
 
-void print_readarcs(cond_t *co)
+void print_dot_readarcs(cond_t *co)
 {
 	array_t *array = co->readarcs;
 	event_t *ev = NULL;
@@ -40,7 +26,7 @@ void print_readarcs(cond_t *co)
 	}
 }
 
-void print_postset(cond_t *co)
+void print_dot_postset(cond_t *co)
 {
 	array_t *array = co->postset;
 	event_t *ev = NULL;
@@ -51,14 +37,14 @@ void print_postset(cond_t *co)
 	}
 }
 
-void print_condition(cond_t *co)
+void print_dot_condition(cond_t *co)
 {
 	printf("  b%d [label=\"b%d (%s)\" shape=circle];\n",
 			co->num,co->num,co->origin->name);
 	if (co->pre_ev->num != -1)
 		printf("  e%d -> b%d;\n", co->pre_ev->num, co->num);
-	print_postset(co);
-	print_readarcs(co);
+	print_dot_postset(co);
+	print_dot_readarcs(co);
 }
 
 void write_dot_output (unf_t *u, nodelist_t *cutoffs)
@@ -72,11 +58,11 @@ void write_dot_output (unf_t *u, nodelist_t *cutoffs)
 
 	g_hash_table_iter_init (&iter, unf->events);
 	while (g_hash_table_iter_next (&iter, &key, &value))
-		print_event((event_t *)value);
+		print_dot_event((event_t *)value);
 
 	g_hash_table_iter_init (&iter, unf->conditions);
 	while (g_hash_table_iter_next (&iter, &key, &value)) 
-		print_condition((cond_t *)value);
+		print_dot_condition((cond_t *)value);
 
 	int num_cutoffs = 0;
 	for (list = cutoffs; list; list = list->next)

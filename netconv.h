@@ -264,10 +264,4 @@ extern char nodelist_compare (nodelist_t*, nodelist_t*);
 
 extern net_t* read_pep_net(char*);
 
-/****************************************************************************/
-/* declarations for dot.c						    */
-
-extern void write_dot_output (unf_t*, nodelist_t*);
-extern void* reverse_list (void*);
-
 #endif

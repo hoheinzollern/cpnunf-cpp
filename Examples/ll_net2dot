@@ -3,12 +3,18 @@
 
 import sys
 
-if (len(sys.argv)!=2):
+if (len(sys.argv)==2):
+    try:
+        ll_net = open(sys.argv[1]).read().splitlines()
+    except:
+        print "File not found."
+elif (len(sys.argv)==1):
+    # TODO: read from stdin
+    pass
+else:
     print "Reads a PEP LL-NET and converts it to a graphviz graph\n"
     print "Usage:\n\t%s net.ll_net | dot -Tpdf > net.pdf" % sys.argv[0]
     sys.exit(0)
-
-ll_net = open(sys.argv[1]).read().splitlines()
 
 places = {}
 transitions = {}
