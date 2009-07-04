@@ -40,6 +40,20 @@ co_t *co_new(int size)
 }
 
 /**
+ * creates an array of empty co-structures
+ */
+co_t *co_array_new(int n)
+{
+	co_t *co = MYmalloc(sizeof(co_t) * n);
+	int i;
+	for (i = 0; i < n; i++) {
+		co[i].len = 0;
+		co[i].conds = NULL;
+	}
+	return co;
+}
+
+/**
  * creates a copy of the co-structure
  */
 co_t *co_copy(co_t *orig)
@@ -59,7 +73,7 @@ co_t *co_copy(co_t *orig)
 }
 
 /**
- * Frees the memory used for a coarray structure
+ * Frees the memory used for a co-structure
  */
 void co_finalize(co_t *co)
 {
@@ -70,6 +84,24 @@ void co_finalize(co_t *co)
 		++co_cond;
 	}
 	free(co->conds);
+	free(co);
+}
+
+/**
+ * Frees the memory used for a co array structure
+ */
+void co_array_finalize(co_t *co, int n)
+{
+	int i;
+	for (i = 0; i < n; i++) {
+		co_cond_t *last = co[i].conds + co[i].len,
+			*co_cond = co[i].conds;
+		while (co_cond < last) {
+			free(co_cond->hists);
+			++co_cond;
+		}
+		free(co[i].conds);
+	}
 	free(co);
 }
 
@@ -324,6 +356,35 @@ void co_insert(co_t *co, cond_t *cond, hist_t *hist)
 	}
 }
 
+void co_insert_co_cond(co_t *co, co_cond_t *cond)
+{
+	co_cond_t *conds = co->conds;
+	int i = 0, len = co->len;
+	while (i < len && conds[i].cond < cond->cond)
+		i++;
+	conds = MYmalloc(sizeof(co_cond_t) * (len+1) );
+	if (len > 0) {
+		memcpy(conds, co->conds, sizeof(co_cond_t) * i);
+		memcpy(conds + i + 1, co->conds + i,
+			sizeof(co_cond_t) * (len-i));
+	}
+	conds[i].cond = cond->cond;
+	conds[i].hists_len = cond->hists_len;
+	conds[i].hists = MYmalloc(sizeof(hist_t *) * cond->hists_len);
+	memcpy(conds[i].hists, cond->hists, sizeof(hist_t *) * cond->hists_len);
+	co->len = len + 1;
+	co->conds = conds;
+#ifdef __DEBUG__
+	g_assert(co->len > 0);
+	g_assert(co->conds != NULL);
+	for (i = 0; i < co->len; i++) {
+		g_assert(co->conds[i].cond != NULL);
+		g_assert(co->conds[i].hists_len > 0);
+		g_assert(co->conds[i].hists != NULL);
+	}
+#endif
+}
+
 /**
  * Given an enriched event e, returns the pairs <b, H> in the postset of e
  * as a co structure.
@@ -389,11 +450,12 @@ co_t *co_relation(hist_t *hist)
 		pred++;
 	}
 	co_drop_preset(tmp, hist->e);
-	check_co(tmp);
 	co_t *co_post = co_postset_e(hist);
-	check_co(co_post);
 	co_t *result = co_union(tmp, co_post);
+#ifdef __DEBUG__
+	check_co(tmp);
 	check_co(result);
+#endif
 	co_finalize(tmp);
 	co_finalize(co_post);
 	
@@ -502,6 +564,7 @@ UNFbool cutoff(hist_t *h1)
 void unfold ()
 {
 	unf = nc_create_unfolding();
+	parikh_init();
 	
 	// root event and initial marking:
 	event_t *ev = unf->root = (event_t *)MYmalloc(sizeof(event_t));
@@ -558,5 +621,6 @@ void unfold ()
 			pe(h);
 		} else
 			nodelist_push(&cutoff_list, h);
-	} 
+	}
+	parikh_finish();
 }

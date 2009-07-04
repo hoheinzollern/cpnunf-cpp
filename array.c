@@ -20,6 +20,19 @@ array_t *array_new(int len)
 	return array;
 }
 
+array_t *array_copy(array_t *array)
+{
+	array_t *res = (array_t *)MYmalloc(sizeof(array_t));
+	res->len = array->len;
+	res->count = array->count;
+	if (res->len>0) {
+		res->data = MYmalloc(sizeof(void *) * res->len);
+		memcpy(res->data, array->data, sizeof(void *) * res->len);
+	} else
+		res->data = NULL;
+	return res;
+}
+
 /// Frees an entire array structure
 void array_delete(array_t *array)
 {
@@ -74,7 +87,6 @@ void array_insert_ordered(array_t *array, void *val)
 #ifdef __DEBUG__
 	g_assert(val!=NULL);
 #endif
-	array_append(array, val);
 	int i = 0;
 	while (i<array->count && array->data[i]<val)
 		i++;

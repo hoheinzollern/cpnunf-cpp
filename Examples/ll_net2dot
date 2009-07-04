@@ -5,12 +5,11 @@ import sys
 
 if (len(sys.argv)==2):
     try:
-        ll_net = open(sys.argv[1]).read().splitlines()
+        ll_net = open(sys.argv[1])
     except:
         print "File not found."
 elif (len(sys.argv)==1):
-    # TODO: read from stdin
-    pass
+        ll_net = sys.stdin
 else:
     print "Reads a PEP LL-NET and converts it to a graphviz graph\n"
     print "Usage:\n\t%s net.ll_net | dot -Tpdf > net.pdf" % sys.argv[0]
@@ -18,11 +17,11 @@ else:
 
 places = {}
 transitions = {}
-if (ll_net.pop(0) == "PEP" and ll_net.pop(0) == "PetriBox" and
-    ll_net.pop(0) == "FORMAT_N2" and ll_net.pop(0) == "PL"):
+if (ll_net.readline()[:-1] == "PEP" and ll_net.readline()[:-1] == "PetriBox" and
+    ll_net.readline()[:-1] == "FORMAT_N2" and ll_net.readline()[:-1] == "PL"):
     try:
         print "digraph test {"
-        line = ll_net.pop(0)
+        line = ll_net.readline()[:-1]
         # Print places
         while line != "TR":
             tokens = line.split("\"")
@@ -32,35 +31,35 @@ if (ll_net.pop(0) == "PEP" and ll_net.pop(0) == "PetriBox" and
             else:
                 print "\t\"%s\" [label=\"%s\" shape=circle];" % (tokens[1],tokens[1])
             places[tokens[0]] = tokens[1]
-            line = ll_net.pop(0)
-        line = ll_net.pop(0)
+            line = ll_net.readline()[:-1]
+        line = ll_net.readline()[:-1]
         
         # Print transitions
         while line != "TP":
             tokens = line.split("\"")
             print "\t\"%s\" [label=\"%s\" shape=box];" % (tokens[1],tokens[1])
             transitions[tokens[0]] = tokens[1]
-            line = ll_net.pop(0)
-        line = ll_net.pop(0)
+            line = ll_net.readline()[:-1]
+        line = ll_net.readline()[:-1]
         
         # Print consume arcs
         while line != "PT":
             tokens = line.split("<")
             print "\t\"%s\" -> \"%s\";" % (transitions[tokens[0]],places[tokens[1]])
-            line = ll_net.pop(0)
-        line = ll_net.pop(0)
+            line = ll_net.readline()[:-1]
+        line = ll_net.readline()[:-1]
         
         # Print produce arcs
         while line != "RA":
             tokens = line.split(">")
             print "\t\"%s\" -> \"%s\";" % (places[tokens[0]],transitions[tokens[1]])
-            line = ll_net.pop(0)
-        line = ll_net.pop(0)
+            line = ll_net.readline()[:-1]
+        line = ll_net.readline()[:-1]
         
         # Print read arcs
-        while True:
+        while line != "H" or line != "":
             tokens = line.split("<")
             print "\t\"%s\" -> \"%s\" [dir=none];" % (places[tokens[1]],transitions[tokens[0]])
-            line = ll_net.pop(0)
+            line = ll_net.readline()[:-1]
     except:
         print "}"

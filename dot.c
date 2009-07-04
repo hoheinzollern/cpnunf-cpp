@@ -47,6 +47,27 @@ void print_dot_condition(cond_t *co)
 	print_dot_readarcs(co);
 }
 
+void print_dot_cutoff(event_t* ev)
+{
+	printf("  e%d [label=\"e%d (%s)\" shape=box style=dashed];\n",
+		ev->num,ev->num,ev->origin->name);
+	int i;
+	for (i = 0; i < ev->preset->count; i++)
+		printf("  b%d -> e%d;\n",
+		       ((cond_t*)array_get(ev->preset, i))->num,
+		       ev->num);
+	for (i = 0; i < ev->readarcs->count; i++)
+		printf("  b%d -> e%d [dir=none];\n",
+		       ((cond_t*)array_get(ev->readarcs, i))->num,
+		       ev->num);
+	for (i = 0; i < ev->postset->count; i++) {
+		cond_t *co = ((cond_t*)array_get(ev->postset, i));
+		printf("  b%d [label=\"b%d (%s)\" shape=circle];\n",
+		       co->num, co->num, co->origin->name);
+		printf("  e%d -> b%d;\n", ev->num, co->num);
+	}
+}
+
 void write_dot_output (unf_t *u, nodelist_t *cutoffs)
 {
 	nodelist_t *list;
@@ -71,6 +92,7 @@ void write_dot_output (unf_t *u, nodelist_t *cutoffs)
 		hist_t *h = ((hist_t *)list->node);
 		fprintf(stderr, "cutoff history for e%d (%s);\n",
 			h->e->num, h->e->origin->name);
+		print_dot_cutoff(h->e);
 	}
 
 	printf("}\n");

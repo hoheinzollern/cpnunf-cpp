@@ -8,6 +8,7 @@
 #include "common.h"
 #include "netconv.h"
 #include "unfold.h"
+#include "order.h"
 
 int event_last = 0;
 int cond_last = 0;
@@ -26,26 +27,22 @@ net_t* nc_create_net()
 
 guint mark_hash(gconstpointer pvec)
 {
-	parikh_vec_t *parikh = (parikh_vec_t *)pvec;
+	parikh_t *parikh = (parikh_t *)pvec;
 	guint res1 = 0, res2 = 0, i;
-	for (i = 0; i < parikh->size; i++) {
-		res1 += parikh->parikh[i].appearances;
-		res2 += parikh->parikh[i].tr_num;
+	for (i = 1; parikh[i].tr_num; i++) {
+		res1 += parikh[i].appearances;
+		res2 += parikh[i].tr_num;
 	}
 	return res1 + res2;
 }
 
 gboolean mark_equal(gconstpointer v1, gconstpointer v2)
 {
-	int i;
-	parikh_vec_t *vec1 = (parikh_vec_t*)v1,
-		*vec2 = (parikh_vec_t*)v2;
-	gboolean res = vec1->size==vec2->size;
-	for (i = 0; res && i < vec1->size; i++) {
-		res = (vec1->parikh[i].tr_num == vec2->parikh[i].tr_num) &&
-		      (vec1->parikh[i].appearances == vec2->parikh[i].appearances);
-	}
-	return res;
+	parikh_t *vec1 = (parikh_t*)v1,
+		*vec2 = (parikh_t*)v2;
+	UNFbool eq = parikh_compare(vec1, vec2) == 0;
+	g_assert(!eq);
+	return eq;
 }
 
 /**
@@ -221,20 +218,20 @@ event_t *nc_event_new(trans_t *tr, array_t *pre, array_t *read)
 void nc_add_event(event_t *ev)
 {
 	g_hash_table_insert(unf->events, ev, ev);
-	int size = ev->postset->len, i;
-	for (i=0; i<size; i++)
+	int i;
+	for (i=0; i<ev->preset->count; i++)
 	{
 		cond_t *cond = array_get(ev->postset, i);
 		g_hash_table_insert(unf->conditions, cond, cond);
 	}
 	
 	// Update reverse link side
-	for (i=0; i<ev->preset->len; i++)
+	for (i=0; i<ev->preset->count; i++)
 	{
 		cond_t *cond = array_get(ev->preset, i);
 		array_insert_ordered(cond->postset, ev);
 	}
-	for (i=0; i<ev->readarcs->len; i++)
+	for (i=0; i<ev->readarcs->count; i++)
 	{
 		cond_t *cond = array_get(ev->readarcs, i);
 		array_insert_ordered(cond->readarcs, ev);

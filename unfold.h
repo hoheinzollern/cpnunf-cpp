@@ -28,8 +28,12 @@ extern nodelist_t *cutoff_list, *corr_list;  /* cut-off/corresponding list */
 extern nodelist_t *c_cutoffs;	/* cutoff list for c_unf */
 
 extern co_t *co_new(int size);
+extern co_t *co_array_new(int n);
 extern co_t *co_copy(co_t *orig);
 extern void co_finalize(co_t *co);
+extern void co_array_finalize(co_t *co, int n);
+extern void co_insert(co_t *co, cond_t *cond, hist_t *hist);
+extern void co_insert_co_cond(co_t *co, co_cond_t *cond);
 
 extern void unfold();	/* the unfolding procedure */
 

@@ -5,90 +5,101 @@
 #include "netconv.h"
 #include "unfold.h"
 
+parikh_t *parikh;
+parikh_t *pa_last;
+
+int parikh_count;	/* counts the total number of elements in the vector */
+int parikh_size;	/* counts the number of different transitions        */
+
 /**
  * Creates a new parikh vector
  */
-parikh_vec_t *parikh_new ()
+void parikh_init ()
 {
-	parikh_vec_t *vec = MYmalloc(sizeof(parikh_vec_t));
 	if (net->numtr > 0xFFFE)
 	{
-		fprintf(stderr, "Parikh vector has too few entries.\n");
+		fprintf(stderr,"Parikh vector has too few entries.\n");
 		exit(1);
 	}
-	vec->last = vec->parikh = MYmalloc(net->numtr * sizeof(parikh_t));
-	vec->size = vec->count = 0;
-	vec->min = vec->max = 0;
-	return vec;
+	parikh = MYmalloc((net->numtr + 2) * sizeof(parikh_t));
 }
 
 /**
  * Finalizes a parikh vector
  */
-void parikh_finish (parikh_vec_t *vec)
+void parikh_finish ()
 {
-	free(vec->parikh);
-	free(vec);
+	free(parikh);
 }
 
 /**
  * Set the Parikh vector to empty.
  */
-void parikh_reset (parikh_vec_t *vec)
+void parikh_reset ()
 {
-	vec->count = 0;
+	/* The entries 0 and 1 serve as boundary elements. */
+	parikh[0].tr_num = 0;
+	parikh[1].tr_num = 0;
+
+	parikh_count = 0;
+	parikh_size = 0;
+
+	/* Assuming that causally related events are due to transitions
+	   whose numbers are near to each other, we start searching for
+	   additional transitions near the last insertion.		*/
+	pa_last = parikh + 1;
 }
 
 /**
  * Add an appearance of transition number tr_num.
  */
-void parikh_add (parikh_vec_t *vec, unsigned short int tr_num)
+void parikh_add (int tr_num)
 {
-	vec->count++;
-	if (tr_num < vec->last->tr_num)
+	parikh_count++;
+	if (tr_num < pa_last->tr_num)
 	{	/* smaller than last insertion - search downwards */
-		if (tr_num < vec->max)
-			vec->last = vec->parikh - 1;
-		else	
+		if (tr_num < parikh[1].tr_num)
+			pa_last = parikh + 1;
+		else
 		{
-			while (tr_num < (--vec->last)->tr_num);
-			if (tr_num == vec->last->tr_num) goto parikh_add;
-			else vec->last++;
+			while (tr_num < (--pa_last)->tr_num);
+			if (tr_num == pa_last->tr_num) goto parikh_add;
+			else pa_last++;
 		}
 	}
-	else if (tr_num > vec->last->tr_num)
+	else if (tr_num > pa_last->tr_num)
 	{	/* larger than last insertion - search upwards */
-		if (tr_num > vec->parikh[vec->size].tr_num)
-			vec->last = vec->parikh + vec->size - 1;
-		else	
+		if (tr_num > parikh[parikh_size].tr_num)
+			pa_last = parikh + parikh_size + 1;
+		else
 		{
-			while (tr_num > (++vec->last)->tr_num);
-			if (tr_num == vec->last->tr_num) goto parikh_add;
+			while (tr_num > (++pa_last)->tr_num);
+			if (tr_num == pa_last->tr_num) goto parikh_add;
 		}
 	}
 	else
 		goto parikh_add;
 
-	/* insert one appearance of tr_num at vec->last */
-	memmove(vec->last+1, vec->last, sizeof(parikh_t)
-		* (vec->size - (vec->last - vec->parikh)));
-	vec->last->tr_num = tr_num;
-	vec->last->appearances = 1;
-	vec->size++;
+	/* insert one appearance of tr_num at pa_last */
+	memmove(pa_last+1, pa_last, sizeof(parikh_t)
+		* (2 + parikh_size - (pa_last - parikh)));
+	pa_last->tr_num = tr_num;
+	pa_last->appearances = 1;
+	parikh_size++;
 	return;
 
-	parikh_add: vec->last->appearances++;
+	parikh_add: pa_last->appearances++;
 }
 
 /**
  * Finish vector
  */
-void parikh_save (parikh_vec_t *vec)
+parikh_t* parikh_save ()
 {
-	parikh_t *vector = MYmalloc(++vec->size * sizeof(parikh_t));
-	vec->parikh[vec->size].tr_num = 0; /* mark the last array element */
-	memcpy(vector, vec->parikh, vec->size * sizeof(parikh_t));
-	vec->parikh = vector;
+	parikh_t *vector = MYmalloc(++parikh_size * sizeof(parikh_t));
+	parikh[parikh_size].tr_num = 0; /* mark the last array element */
+	memcpy(vector, parikh+1, parikh_size * sizeof(parikh_t));
+	return vector;
 }
 
 /**
@@ -108,16 +119,16 @@ int parikh_compare (parikh_t *pv1, parikh_t *pv2)
 		return pv1->tr_num - pv2->tr_num;
 }
 
-int size_mark_rec(hist_t *hist, parikh_vec_t *vec)
+int size_mark_rec(hist_t *hist)
 {
 	if (!HAS_FLAG(hist->flags, BLACK) && hist->e->num != -1) {
 		SET_FLAG(hist->flags, BLACK);
-		parikh_add(vec, hist->e->origin->num);
+		parikh_add(hist->e->origin->num);
 		int size = 1;
 
 		pred_t *pred = hist->pred, *last = hist->pred + hist->pred_n;
 		while (pred < last) {
-			size += size_mark_rec(pred->hist, vec);
+			size += size_mark_rec(pred->hist);
 			pred++;
 		}
 		return size;
@@ -140,11 +151,11 @@ void size_mark_clean(hist_t *hist)
 
 void size_mark(hist_t *hist)
 {
-	parikh_vec_t *vec = parikh_new();
-	int size = size_mark_rec(hist, vec);
+	parikh_reset();
+	int size = size_mark_rec(hist);
 	size_mark_clean(hist);
 	hist->size = size;
-	hist->parikh = vec;
+	hist->parikh = parikh_save();
 }
 
 /**
@@ -345,7 +356,7 @@ int pe_compare (hist_t *pe1, hist_t *pe2)
 	if (pe1->size > pe2->size) return 1;
 
 	// Then decide by comparing the Parikh vectors.
-	if ((res = parikh_compare(pe1->parikh->parikh, pe2->parikh->parikh)))
+	if ((res = parikh_compare(pe1->parikh, pe2->parikh)))
 		return res;
 
 	return 0;

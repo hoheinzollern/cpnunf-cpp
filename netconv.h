@@ -102,7 +102,7 @@ typedef struct hist_t {
 	struct event_t *e;
 	
 	/// marking of the history
-	struct parikh_vec_t *parikh;
+	struct parikh_t *parikh;
 	
 	/// the predecessors, ordered by b
 	struct pred_t *pred;

@@ -15,6 +15,7 @@ typedef struct array_t {
 } array_t;
 
 extern array_t *array_new(int len);
+extern array_t *array_copy(array_t *array);
 extern void array_delete(array_t *array);
 
 extern void array_append(array_t *array, void *val);

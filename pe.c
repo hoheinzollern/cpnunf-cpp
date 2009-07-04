@@ -121,12 +121,18 @@ array_t *place_postset(array_t *S)
 			array_insert_ordered(T, post->node);
 			post = post->next;
 		}
-		/*nodelist_t *cont = ((place_t *)array_get(S, i))->readarcs;
+		nodelist_t *cont = ((place_t *)array_get(S, i))->readarcs;
 		while (cont != NULL) {
 			array_insert_ordered(T, cont->node);
 			cont = cont->next;
-		}*/
+		}
 	}
+	array_sort(T);
+#ifdef __DEBUG__
+	for (i=0; i < T->count-1; i++) {
+		g_assert(array_get(T, i) < array_get(T, i+1));
+	}
+#endif
 	return T;
 }
 
@@ -144,69 +150,40 @@ array_t *place_postset(array_t *S)
  * 	do not destroy it's histories!
  * 	Note that this structure is not ordered on conditions!
  */
-co_t *test_trans(trans_t *tr, co_t *co, int *n_causes)
+co_t *test_trans(trans_t *tr, co_t *co)
 {
+	int len = tr->preset_size + tr->readarc_size, i, j;
+#ifdef __DEBUG__
 	check_co(co);
+#endif
 	nodelist_t *pre = tr->preset;
-	nodelist_t *context = tr->readarcs;
-	UNFbool good = UNF_TRUE;
-	co_t *pair_co = co_new(tr->preset_size + tr->readarc_size);
-	int count = 0;
-	while (pre != NULL && good == UNF_TRUE) {
-		// TODO: optimize this part: sets of places in the
-		// original net should be kept ordered.
-		int i;
-		// try to find the place of tr's preset in the
-		// co-conditions'image
-		for (i=0; i<co->len &&
-		     co->conds[i].cond->origin!=(place_t *)pre->node;
-		     i++);
-		if (i>=co->len)
-			good = UNF_FALSE;
-		else {
-			// add the found conditions
-			pair_co->conds[count].cond = co->conds[i].cond;
-			pair_co->conds[count].hists = co->conds[i].hists;
-			pair_co->conds[count].hists_len =
-					co->conds[i].hists_len;
-			count++;
+	nodelist_t *ra = tr->readarcs;
+	co_t *S = co_array_new(len);
+
+	for (j = 0; pre != NULL; (pre = pre->next), j++)
+		for (i = 0; i < co->len; i++)
+			if (co->conds[i].cond->origin == pre->node)
+				co_insert_co_cond(S + j, co->conds + i);
+
+	for (j = 0; ra != NULL; (ra = ra->next), j++)
+		for (i = 0; i < co->len; i++)
+			if (co->conds[i].cond->origin == ra->node)
+				co_insert_co_cond(S + j + tr->preset_size,
+						  co->conds + i);
+	// Check if every place has at list one condition:
+	for (i = 0; i < len; i++) {
+		if (S[i].len == 0) {
+			co_array_finalize(S, len);
+			return NULL;
 		}
-		pre = pre->next;
-	}
-	*n_causes = count;
-	while (context != NULL && good == UNF_TRUE
-	       && count < pair_co->len) {
-		// TODO: optimize this part: sets of places in the
-		// original net should be kept ordered.
-		int i;
-		// try to find the place of tr's context in the
-		// co-conditions'image
-		for (i=0; i<co->len &&
-		     co->conds[i].cond->origin!=(place_t *)context->node;
-		     i++);
-		if (i>=co->len)
-			good = UNF_FALSE;
+#ifdef __DEBUG__
 		else {
-			// add the found conditions
-			pair_co->conds[count].cond = co->conds[i].cond;
-			pair_co->conds[count].hists = co->conds[i].hists;
-			pair_co->conds[count].hists_len =
-					co->conds[i].hists_len;
+			check_co(S + i);
 		}
-		count++;
-		context = context->next;
+#endif
 	}
-	pair_co->len = count;
-	check_co(pair_co);
-	if (good) {
-		return pair_co;
-	} else {
-		// don't call co_finalize as pair_co shares histories
-		// with co
-		free(pair_co->conds);
-		free(pair_co);
-		return NULL;
-	}
+	// Return the array of co structures:
+	return S;
 }
 
 /**
@@ -256,46 +233,11 @@ UNFbool pairwise_concurrent(pred_t *preds, int j)
  * @arg cond the condition
  * @return the result of the test
  */
-UNFbool hist_causal_for(hist_t *hist, cond_t *cond)
+UNFbool hist_c(hist_t *hist, cond_t *cond)
 {
 	if (cond->pre_ev == hist->e)
 		return UNF_TRUE;
 	return UNF_FALSE;
-}
-
-void find_pred(trans_t *t, co_t *B, int n_causes, pred_t *preds, int depth,
-	       int *pred_n);
-/**
- * Recursive function; computes all possible subsets of concurrent read
- * histories
- */
-void read_hist_subset_rec(trans_t *t, co_t *B, int n_causes, pred_t *preds,
-			  int depth, int *pred_n, int i)
-{
-	if (i>=0) {
-		co_cond_t *cond = B->conds + depth;
-		if (!hist_causal_for(cond->hists[i], cond->cond)) {
-			// predecessors without cond->hists[i]
-			read_hist_subset_rec(t, B, n_causes, preds, depth,
-					     pred_n, i-1);
-
-			// predecessors with cond->hists[i]
-			preds[*pred_n].cond = cond->cond;
-			SET_FLAG(preds[*pred_n].flags, HIST_R);
-			if (pairwise_concurrent(preds, *pred_n)) {
-				++*pred_n;
-				read_hist_subset_rec(t, B, n_causes, preds,
-						     depth, pred_n, i-1);
-				--*pred_n;
-			}
-		} else {
-			// Causal history, ignore it
-			read_hist_subset_rec(t, B, n_causes, preds, depth,
-					     pred_n, i-1);
-		}
-	} else {
-		find_pred(t, B, n_causes, preds, depth+1, pred_n);
-	}
 }
 
 void pred_sort(pred_t *pred, int pred_n)
@@ -303,15 +245,129 @@ void pred_sort(pred_t *pred, int pred_n)
 	int i, j;
 	for (i=1; i<pred_n; i++) {
 		j = i-1;
-		pred_t tmp = pred[i];
+		pred_t tmp;
 		memcpy(&tmp, pred + i, sizeof(pred_t));
 		while (j>=0 && pred[j].cond > tmp.cond) {
 			memcpy(pred + j + 1, pred + j, sizeof(pred_t));
 			--j;
 		}
 		memcpy(pred + j + 1, &tmp, sizeof(pred_t));
-		// TODO: check if structure assignment makes a valid copy of
-		// the entire structure.
+	}
+#ifdef __DEBUG__
+	for (i = 0; i < pred_n-1; i++) {
+		g_assert(pred[i].cond < pred[i+1].cond);
+	}
+#endif
+}
+
+void set_cond(array_t *preset, array_t *readarcs, int i, cond_t *co)
+{
+	if (i < preset->count) {
+		array_get(preset, i) = co;
+	} else {
+		array_get(readarcs, i-preset->count) = co;
+	}
+}
+
+void find_subset_rec(trans_t *t, co_t *S, pred_t *preds, array_t *ps, array_t *ra,
+		     int s_i, int pred_i, int i, int j, int added);
+void find_pred_rec(trans_t *t, co_t *S, pred_t *preds, array_t *ps, array_t *ra,
+		   int s_i, int pred_i)
+{
+	int i;
+	if (s_i < t->preset_size) {
+		// Only for the preset: find subset of read histories
+		for (i = 0; i < S[s_i].len; i++) {
+			find_subset_rec(t, S, preds, ps, ra, s_i, pred_i, i,
+					(S[s_i].conds + i)->hists_len-1, 0);
+		}
+	}
+
+	if (s_i < t->preset_size + t->readarc_size) {
+		// Preset and readarcs: select a causal history and go on
+		int j;
+		SET_FLAG(preds[pred_i].flags, HIST_C);
+		for (i = 0; i < S[s_i].len; i++) {
+			co_cond_t *cond = S[s_i].conds + i;
+			preds[pred_i].cond = cond->cond;
+			set_cond(ps, ra, s_i, cond->cond);
+			// Chose a causal history for the current condition,
+			// check if it is pairwise concurrent with all other
+			// histories; if so continue computing the predecessors
+			// with this history.
+			for (j = 0; j < cond->hists_len; j++) {
+				preds[pred_i].hist = cond->hists[j];
+				if (hist_c(cond->hists[j], cond->cond) &&
+				    pairwise_concurrent(preds, pred_i))
+					find_pred_rec(t, S, preds, ps, ra,
+						      s_i+1, pred_i+1);
+			}
+		}
+	} else {
+		// Predecessor list complete: add history to pe
+		// Find if there is already the event in the unfolding whose
+		// image in the original net is t; if not, create it.
+		array_t *events = preds->cond->postset;
+		event_t *e = NULL;
+		i = 0;
+		while (i < events->count &&
+		       ((event_t*)array_get(events, i))->origin != t)
+			i++;
+		if (i >= events->count) {
+			// Event not found in the unfolding, try to find it
+			// in the list of possible extensions
+
+			// TODO
+
+			// Event not found, create it.
+			e = nc_event_new(t, array_copy(ps), array_copy(ra));
+		} else
+			e = array_get(events, i);
+
+		hist_t *hist = (hist_t *)MYmalloc(sizeof(hist_t));
+		hist->e = e;
+		hist->flags = 0;
+		hist->pred_n = t->preset_size + t->readarc_size;
+		hist->pred = MYmalloc(sizeof(pred_t) * hist->pred_n);
+		memcpy(hist->pred, preds, sizeof(pred_t) * hist->pred_n);
+		pred_sort(hist->pred, hist->pred_n);
+		size_mark(hist);
+		// Add the newly created history to the list of possible
+		// extensions
+		pe_insert(hist);
+	}
+}
+
+/**
+ * Recursive function; computes all possible subsets of concurrent read
+ * histories
+ */
+void find_subset_rec(trans_t *t, co_t *S, pred_t *preds, array_t *ps, array_t *ra,
+		     int s_i, int pred_i, int i, int j, int added)
+{
+	co_cond_t *cond = S[s_i].conds + i;
+	if (j>=0) {
+		if (!hist_c(cond->hists[j], cond->cond)) {
+			// predecessors without cond->hists[j]
+			find_subset_rec(t, S, preds, ps, ra, s_i, pred_i, i,
+					j-1, added);
+
+			// predecessors with cond->hists[j]
+			preds[pred_i].cond = cond->cond;
+			SET_FLAG(preds[pred_i].flags, HIST_R);
+			preds[pred_i].hist = cond->hists[j];
+			if (pairwise_concurrent(preds, pred_i)) {
+				find_subset_rec(t, S, preds, ps, ra, s_i,
+						     pred_i+1, i, j-1, added+1);
+			}
+		} else {
+			// Causal history, ignore it
+			find_subset_rec(t, S, preds, ps, ra, s_i, pred_i, i,
+					j-1, added);
+		}
+	} else if (added > 0) {
+		set_cond(ps, ra, s_i, cond->cond);
+		find_pred_rec(t, S, preds, ps, ra, s_i+1, pred_i);
 	}
 }
 
@@ -319,122 +375,26 @@ void pred_sort(pred_t *pred, int pred_n)
  * Find all possible pairwise concurrent sets of predecessors for a new history;
  * once one set is found add it to possible extensions
  */
-void find_pred(trans_t *t, co_t *B, int n_causes, pred_t *preds, int depth,
-	       int *pred_n)
+void find_pred(trans_t *t, co_t *S)
 {
-	if (depth == 0) {
-		pred_n = (int *)MYmalloc(sizeof(int));
-		*pred_n = 0;
-		int size = 0;
-		int i;
-		for (i = 0; i < B->len; i++)
-			size += B->conds[i].hists_len;
-		// Allocate the maximum possible length for a predecessors list
-		preds = (pred_t *)MYmalloc(sizeof(pred_t) * size);
+	int i, j, pred_size = 0;
+	for (i = 0; i < t->preset_size; i++) {
+		int max_h = 0;
+		for (j = 0; j < S[i].len; j++)
+			if (S[i].conds->hists_len > max_h)
+				max_h = S[i].conds->hists_len;
+		pred_size += max_h;
 	}
-	if (depth < B->len) {
-		int i;
-		co_cond_t *cond = B->conds + depth;
-		preds[*pred_n].cond = cond->cond;
-		if (depth < n_causes) {
-			SET_FLAG(preds[*pred_n].flags, HIST_C);
-			// Chose a causal history for the current condition,
-			// check if it is pairwise concurrent with all other
-			// histories; if so continue computing the predecessors
-			// with this history.
-			for (i = 0; i<cond->hists_len; i++)
-			     if (hist_causal_for(cond->hists[i],
-						 preds[*pred_n].cond)
-				 && pairwise_concurrent(preds, *pred_n)) {
-				preds[*pred_n].hist = cond->hists[i];
-				// all chosen predecessors are pairwise
-				// concurrent, go on.
-				++(*pred_n);
-				find_pred(t, B, n_causes, preds, depth + 1,
-					  pred_n);
-				--(*pred_n);
-			}
-			//			OR
-			// Chose each concurrent subset of read histories and do
-			// the same thing.
-			for (i = 0; i<cond->hists_len; i++)
-			     if (!hist_causal_for(cond->hists[i], cond->cond)
-					&& pairwise_concurrent(preds, *pred_n))
-				     {
-				// chose this history Hi as a pivot and then
-				// a subset of H' s.t. H' < Hi and H' is readH
-				preds[*pred_n].hist = cond->hists[i];
-				++(*pred_n);
-				read_hist_subset_rec(t, B, n_causes, preds,
-					depth, pred_n, i-1);
-				--(*pred_n);
-			}
-		} else {
-			SET_FLAG(preds[*pred_n].flags, HIST_R);
-			// Chose a read history for the current condition, check
-			// if it is pairwise concurrent with all other
-			// histories; if so continue computing the predecessors
-			// with this history.
-			for (i = 0; i<cond->hists_len; i++) {
-				preds[*pred_n].hist = cond->hists[i];
-				if (hist_causal_for(cond->hists[i],
-						    preds[*pred_n].cond)
-					&& pairwise_concurrent(preds, *pred_n))
-					{
-					// all chosen predecessors are pairwise
-					// concurrent, go on.
-					++(*pred_n);
-					find_pred(t, B, n_causes, preds,
-						  depth + 1, pred_n);
-					--(*pred_n);
-				}
-			}
-		}
-	} else {
-		// we found a set of concurrent predecessors for H, add it to
-		// pe; find if there is already the event in the unfolding whose
-		// image in the original net is t; if not, create it.
-		array_t *events = NULL;
-		if (n_causes>0)
-			events = preds->cond->postset;
-		else
-			events = preds->cond->readarcs;
-		int j = 0;
-		while (j<events->count &&
-		       ((event_t*)array_get(events, j))->origin != t)
-			j++;
-		event_t *e;
-		if (j>=events->count) {
-			// Event not found, create it.
-			// Create array for preset and readarcs
-			array_t *preset = array_new(n_causes);
-			for (j = 0; j<n_causes; j++)
-				array_get(preset, j) = B->conds[j].cond;
-			array_t *readarcs = array_new(B->len - n_causes);
-			for (j = n_causes; j<B->len; j++)
-				array_get(readarcs, j-n_causes) =
-						B->conds[j].cond;
-			// Create the event
-			e = nc_event_new(t, preset, readarcs);
-		} else
-			e = (event_t*)array_get(events, j);
-
-		hist_t *hist = (hist_t *)MYmalloc(sizeof(hist_t));
-		hist->e = e;
-		hist->flags = 0;
-		hist->pred = MYmalloc(sizeof(pred_t) * *pred_n);
-		hist->pred_n = *pred_n;
-		memcpy(hist->pred, preds, sizeof(pred_t) * *pred_n);
-		pred_sort(hist->pred, hist->pred_n);
-		size_mark(hist);
-		// Add the newly created history to the list of possible
-		// extensions
-		pe_insert(hist);
-	}
-	if (depth == 0) {
-		free(pred_n);
-		free(preds);
-	}
+	pred_size += t->readarc_size;
+	array_t *ps = array_new(t->preset_size);
+	ps->count = ps->len;
+	array_t *ra = array_new(t->readarc_size);
+	ps->count = ps->len;
+	pred_t *preds = MYmalloc(sizeof(pred_t) * pred_size);
+	find_pred_rec(t, S, preds, ps, ra, 0, 0);
+	free(preds);
+	array_delete(ps);
+	array_delete(ra);
 }
 
 /**
@@ -451,15 +411,14 @@ void pe (hist_t *h)
 	co_t *co = (co_t *)g_hash_table_lookup(h->e->co, h);
 	int i;
 	for (i = 0; i<T->count; i++) {
-		int n_causes;
+		trans_t *tr = array_get(T, i);
 		check_co(co);
-		co_t *B = test_trans(array_get(T, i), co, &n_causes);
-		if (B != NULL) {
+		co_t *S = test_trans(tr, co);
+		if (S != NULL) {
 			// *t U _t_ is a subset of im(co)
-			check_co(B);
-			find_pred(array_get(T, i), B, n_causes, NULL, 0, NULL);
-			free(B->conds);
-			free(B);
+			find_pred(tr, S);
+			co_array_finalize(S, tr->preset_size +
+					  tr->readarc_size);
 		}
 	}
 }
