@@ -219,6 +219,11 @@ event_t *nc_event_new(trans_t *tr, array_t *pre, array_t *read)
 	return ev;
 }
 
+int nc_next_cutoff_event()
+{
+	return event_last++;
+}
+
 /**
  * Adds an event and it's postset to the unfolding
  */
@@ -226,9 +231,12 @@ void nc_add_event(event_t *ev)
 {
 	g_hash_table_insert(unf->events, ev, ev);
 	int i;
-	for (i=0; i<ev->preset->count; i++)
+	for (i=0; i<ev->postset->count; i++)
 	{
 		cond_t *cond = array_get(ev->postset, i);
+#ifdef __DEBUG__
+		g_assert(cond != NULL);
+#endif
 		g_hash_table_insert(unf->conditions, cond, cond);
 	}
 	
@@ -236,11 +244,17 @@ void nc_add_event(event_t *ev)
 	for (i=0; i<ev->preset->count; i++)
 	{
 		cond_t *cond = array_get(ev->preset, i);
+#ifdef __DEBUG__
+		g_assert(cond != NULL);
+#endif
 		array_insert_ordered(cond->postset, ev);
 	}
 	for (i=0; i<ev->readarcs->count; i++)
 	{
 		cond_t *cond = array_get(ev->readarcs, i);
+#ifdef __DEBUG__
+		g_assert(cond != NULL);
+#endif
 		array_insert_ordered(cond->readarcs, ev);
 	}
 }

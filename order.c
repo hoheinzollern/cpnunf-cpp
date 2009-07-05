@@ -164,9 +164,27 @@ void size_mark(hist_t *hist)
 {
 	parikh_reset();
 	hist->marking = (guchar *)MYcalloc(sizeof(guchar) * net->numpl);
-	int size = size_mark_rec(hist);
-	size_mark_clean(hist);
-	hist->size = size;
+	if (hist->e->num != -1) {
+		int size = 1;
+		pred_t *pred = hist->pred, *last = hist->pred + hist->pred_n;
+		while (pred < last) {
+			size += size_mark_rec(pred->hist);
+			pred++;
+		}
+		pred = hist->pred;
+		while (pred < last) {
+			size_mark_clean(pred->hist);
+			pred++;
+		}
+		nodelist_t *ps = ((trans_t*)hist->e)->postset;
+		for (; ps; ps = ps->next) {
+			place_t *pl = (place_t*)ps->node;
+			hist->marking[pl->num-1] = 1;
+		}
+		hist->size = size;
+	} else {
+		hist->size = 0;
+	}
 	hist->parikh = parikh_save();
 }
 

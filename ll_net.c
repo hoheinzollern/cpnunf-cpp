@@ -44,18 +44,18 @@ void print_ll_postset(cond_t *co)
 
 void print_ll_condition(cond_t *co)
 {
-	printf("%d\"b%d (%s)\"\n", co->num,co->num,co->origin->name);
+	printf("%d\"b%d (%s)\"\n", co->num, co->num, co->origin->name);
 }
 
-void print_ll_history_rec(hist_t *h)
+void print_ll_history_rec(FILE *stream, hist_t *h)
 {
 	if (!HAS_FLAG(h->flags, BLACK) && h->e->num!=-1) {
 		SET_FLAG(h->flags, BLACK);
 
-		printf("%d ", h->e->num);
+		fprintf(stream, "%d ", h->e->num);
 		pred_t *pred = h->pred, *last = h->pred + h->pred_n;
 		while (pred < last) {
-			print_ll_history_rec(pred->hist);
+			print_ll_history_rec(stream, pred->hist);
 			++pred;
 		}
 	}
@@ -74,11 +74,11 @@ void history_cleanup(hist_t *h)
 	}
 }
 
-void print_ll_history(hist_t *h)
+void print_ll_history(FILE *stream, hist_t *h)
 {
-	printf("H[%d]={ ", h->e->num);
-	print_ll_history_rec(h);
-	printf("}\n");
+	fprintf(stream, "H[%d]={ ", h->e->num);
+	print_ll_history_rec(stream, h);
+	fprintf(stream, "}\n");
 	history_cleanup(h);
 }
 
@@ -131,7 +131,7 @@ void write_ll_net (unf_t *u, nodelist_t *cutoffs, UNFbool hist)
 			GHashTableIter hiter;
 			g_hash_table_iter_init(&hiter, ev->hist);
 			while (g_hash_table_iter_next (&hiter, &key, &value)) {
-				print_ll_history((hist_t*)value);
+				print_ll_history(stdout, (hist_t*)value);
 			}
 		}
 	}
@@ -141,8 +141,8 @@ void write_ll_net (unf_t *u, nodelist_t *cutoffs, UNFbool hist)
 	{
 		num_cutoffs++;
 		hist_t *h = ((hist_t *)list->node);
-		fprintf(stderr, "cutoff history for e%d (%s);\n",
-			h->e->num, h->e->origin->name);
+		fprintf(stderr, "cutoff history for (%s);\n",
+			((trans_t*)h->e)->name);
 	}
 
 	fprintf(stderr, "%d cutoff histories\n", num_cutoffs);

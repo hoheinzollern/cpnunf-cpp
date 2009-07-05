@@ -18,8 +18,13 @@
 
 #define CLEAN_FLAG(flags, flag) ((flags) = ((flags) & ~(flag)))
 
+#define CLEAR_FLAGS(flags) ((flags) = 0)
+
 #define HIST_R 0x01
 #define HIST_C 0x02
+
+#define PRESET 0x04
+#define CONTEXT 0x08
 
 #define BLACK 0x01
 
@@ -251,6 +256,7 @@ extern void nc_compute_sizes (net_t*);
 extern void nc_static_checks (net_t*,char*);
 extern cond_t *nc_cond_new(place_t *pl, event_t *ev);
 extern event_t *nc_event_new(trans_t *tr, array_t *pre, array_t *read);
+extern int nc_next_cutoff_event();
 extern void nc_add_event(event_t *ev);
 
 /*****************************************************************************/

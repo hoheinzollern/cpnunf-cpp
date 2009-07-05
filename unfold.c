@@ -107,14 +107,14 @@ void co_array_finalize(co_t *co, int n)
 	free(co);
 }
 
-void co_print(co_t *co)
+void co_fprint(FILE *stream, co_t *co)
 {
 	int i, j;
 	for (i = 0; i < co->len; i++) {
-		printf("b%d (%s): ", co->conds[i].cond->num,
+		fprintf(stream, "b%d (%s): ", co->conds[i].cond->num,
 		       co->conds[i].cond->origin->name);
 		for (j = 0; j < co->conds[i].hists_len; j++) {
-			print_ll_history(co->conds[i].hists[j]);
+			print_ll_history(stream, co->conds[i].hists[j]);
 		}
 	}
 }
@@ -227,7 +227,9 @@ void co_drop_preset(co_t *co, event_t *ev)
  */
 void co_cond_copy(co_cond_t *dst, co_cond_t *src)
 {
+#ifdef __DEBUG__
 	check_co_cond(src);
+#endif
 	dst->cond = src->cond;
 	dst->hists_len = src->hists_len;
 #ifdef __DEBUG__
@@ -271,6 +273,21 @@ void hist_union(hist_t **h1, int len_h1, hist_t **h2, int len_h2,
 	}
 	*len_h3 = k;
 	// TODO: strip the size of the union
+
+
+#ifdef __DEBUG__
+	// Check if union has all necessary histories
+	i = 0; j = 0; k = 0;
+	while (i < len_h1 || j < len_h2) {
+		g_assert((i < len_h1 && h1[i] == (*h3)[k]) ||
+			 (j < len_h2 && h2[j] == (*h3)[k]));
+		if (i < len_h1 && h1[i] == (*h3)[k])
+			i++;
+		if (j < len_h2 && h2[j] == (*h3)[k])
+			j++;
+		k++;
+	}
+#endif
 }
 
 /**
@@ -278,8 +295,10 @@ void hist_union(hist_t **h1, int len_h1, hist_t **h2, int len_h2,
  */
 co_t *co_union(co_t *a, co_t *b)
 {
+#ifdef __DEBUG__
 	check_co(a);
 	check_co(b);
+#endif
 	co_t *c = co_new(a->len + b->len);
 	c->len = 0;
 	
@@ -289,6 +308,7 @@ co_t *co_union(co_t *a, co_t *b)
 	while (cond_a < last_a && cond_b < last_b) {
 #ifdef __DEBUG__
 		g_assert(a->len != 0);
+		g_assert(b->len != 0);
 #endif
 		if (cond_a->cond < cond_b->cond) {
 			co_cond_copy(cond_c, cond_a);
@@ -305,23 +325,42 @@ co_t *co_union(co_t *a, co_t *b)
 		}
 		c->len++;
 		cond_c++;
+#ifdef __DEBUG__
 		check_co(c);
+#endif
 	}
 	while (cond_a < last_a) {
 		co_cond_copy(cond_c, cond_a);
 		cond_a++;
 		c->len++;
 		cond_c++;
+#ifdef __DEBUG__
 		check_co(c);
+#endif
 	}
-	while (cond_b < last_b && b->len > 0) {
+	while (cond_b < last_b) {
 		co_cond_copy(cond_c, cond_b);
 		cond_b++;
 		c->len++;
 		cond_c++;
+#ifdef __DEBUG__
 		check_co(c);
+#endif
 	}
 	
+#ifdef __DEBUG__
+	// Check if union has all necessary conditions
+	cond_a = a->conds; cond_b = b->conds; cond_c = c->conds;
+	while (cond_a < last_a || cond_b < last_b) {
+		g_assert((cond_a < last_a && cond_a->cond == cond_c->cond) ||
+			 (cond_b < last_b && cond_b->cond == cond_c->cond));
+		if (cond_a < last_a && cond_a->cond == cond_c->cond)
+			cond_a++;
+		if (cond_b < last_b && cond_b->cond == cond_c->cond)
+			cond_b++;
+		cond_c++;
+	}
+#endif
 	return c;
 }
 
@@ -517,6 +556,9 @@ co_t *co_relation(hist_t *hist)
 			}
 		}
 	}
+	fprintf(stderr, "co[e%d]:\n", hist->e->num);
+	co_fprint(stderr, result);
+	fprintf(stderr, "\n\n");
 	return result;
 }
 
@@ -559,12 +601,33 @@ co_t *qco_relation(hist_t *hist)
  */
 void add_history(hist_t *hist)
 {
-	event_t *e = hist->e;
-	// Finds if an event is in the unfolding:
-	if (!g_hash_table_lookup(unf->events, hist->e))
-	{
+	// Find if there is already the event in the unfolding whose
+	// image in the original net is t; if not, create it.
+	array_t *events = hist->pred->cond->postset;
+	event_t *e = NULL;
+	trans_t *t = (trans_t*)hist->e;
+	int i = 0;
+	while (i < events->count &&
+	       ((event_t*)array_get(events, i))->origin != t)
+		i++;
+	if (i >= events->count) {
+		// Event not found, create it.
+		array_t *ps = array_new(0), *ra = array_new(0);
+		pred_t *pred = hist->pred, *last = hist->pred + hist->pred_n;
+		for (; pred < last; ++pred) {
+			if (HAS_FLAG(pred->flags, PRESET)) {
+				array_insert_ordered(ps, pred->cond);
+			} else {
+				array_insert_ordered(ra, pred->cond);
+			}
+		}
+		e = nc_event_new(t, ps, ra);
 		nc_add_event(e);
-	}
+	} else
+		e = array_get(events, i);
+	hist->e = e;
+
+	// Add history to the unfolding
 	g_hash_table_insert(e->hist, hist, hist);
 	
 	// Computes co and qco relations
@@ -579,7 +642,6 @@ void add_history(hist_t *hist)
 	
 	// Adds the marking of hist to the unfolding
 #ifdef __DEBUG__
-	int i;
 	for (i = 0; i < net->numpl; i++)
 		g_assert(hist->marking[i] == 0 || hist->marking[i] == 1);
 #endif
@@ -633,13 +695,10 @@ void unfold ()
 	ev->hist = g_hash_table_new(NULL, NULL);
 	
 	// empty history for root event
-	hist_t *h0 = (hist_t *)MYmalloc(sizeof(hist_t));
-	g_hash_table_insert(ev->hist, h0, h0);
+	hist_t *h0 = (hist_t *)MYcalloc(sizeof(hist_t));
 	h0->e = ev;
-	h0->flags = 0;
-	h0->pred = NULL;
-	h0->pred_n = 0;
 	size_mark(h0);
+	g_hash_table_insert(ev->hist, h0, h0);
 	// initialize co-conditions:
 	co_t *co = co_new(ev->postset->count);
 	int i;

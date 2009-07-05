@@ -260,25 +260,15 @@ void pred_sort(pred_t *pred, int pred_n)
 #endif
 }
 
-void set_cond(array_t *preset, array_t *readarcs, int i, cond_t *co)
-{
-	if (i < preset->count) {
-		array_get(preset, i) = co;
-	} else {
-		array_get(readarcs, i-preset->count) = co;
-	}
-}
-
-void find_subset_rec(trans_t *t, co_t *S, pred_t *preds, array_t *ps, array_t *ra,
+void find_subset_rec(trans_t *t, co_t *S, pred_t *preds,
 		     int s_i, int pred_i, int i, int j, int added);
-void find_pred_rec(trans_t *t, co_t *S, pred_t *preds, array_t *ps, array_t *ra,
-		   int s_i, int pred_i)
+void find_pred_rec(trans_t *t, co_t *S, pred_t *preds, int s_i, int pred_i)
 {
 	int i;
 	if (s_i < t->preset_size) {
 		// Only for the preset: find subset of read histories
 		for (i = 0; i < S[s_i].len; i++) {
-			find_subset_rec(t, S, preds, ps, ra, s_i, pred_i, i,
+			find_subset_rec(t, S, preds, s_i, pred_i, i,
 					(S[s_i].conds + i)->hists_len-1, 0);
 		}
 	}
@@ -286,11 +276,15 @@ void find_pred_rec(trans_t *t, co_t *S, pred_t *preds, array_t *ps, array_t *ra,
 	if (s_i < t->preset_size + t->readarc_size) {
 		// Preset and readarcs: select a causal history and go on
 		int j;
+		CLEAR_FLAGS(preds[pred_i].flags);
+		if (s_i < t->preset_size)
+			SET_FLAG(preds[pred_i].flags, PRESET);
+		else
+			SET_FLAG(preds[pred_i].flags, CONTEXT);
 		SET_FLAG(preds[pred_i].flags, HIST_C);
 		for (i = 0; i < S[s_i].len; i++) {
 			co_cond_t *cond = S[s_i].conds + i;
 			preds[pred_i].cond = cond->cond;
-			set_cond(ps, ra, s_i, cond->cond);
 			// Chose a causal history for the current condition,
 			// check if it is pairwise concurrent with all other
 			// histories; if so continue computing the predecessors
@@ -299,35 +293,19 @@ void find_pred_rec(trans_t *t, co_t *S, pred_t *preds, array_t *ps, array_t *ra,
 				preds[pred_i].hist = cond->hists[j];
 				if (hist_c(cond->hists[j], cond->cond) &&
 				    pairwise_concurrent(preds, pred_i))
-					find_pred_rec(t, S, preds, ps, ra,
+					find_pred_rec(t, S, preds,
 						      s_i+1, pred_i+1);
 			}
 		}
 	} else {
 		// Predecessor list complete: add history to pe
-		// Find if there is already the event in the unfolding whose
-		// image in the original net is t; if not, create it.
-		array_t *events = preds->cond->postset;
-		event_t *e = NULL;
-		i = 0;
-		while (i < events->count &&
-		       ((event_t*)array_get(events, i))->origin != t)
-			i++;
-		if (i >= events->count) {
-			// Event not found in the unfolding, try to find it
-			// in the list of possible extensions
-
-			// TODO
-
-			// Event not found, create it.
-			e = nc_event_new(t, array_copy(ps), array_copy(ra));
-		} else
-			e = array_get(events, i);
 
 		hist_t *hist = (hist_t *)MYmalloc(sizeof(hist_t));
-		hist->e = e;
+		// Save transition instead of event, it will be added when
+		// adding the history to the unfolding:
+		hist->e = (event_t*)t;
 		hist->flags = 0;
-		hist->pred_n = t->preset_size + t->readarc_size;
+		hist->pred_n = pred_i;
 		hist->pred = MYmalloc(sizeof(pred_t) * hist->pred_n);
 		memcpy(hist->pred, preds, sizeof(pred_t) * hist->pred_n);
 		pred_sort(hist->pred, hist->pred_n);
@@ -342,32 +320,33 @@ void find_pred_rec(trans_t *t, co_t *S, pred_t *preds, array_t *ps, array_t *ra,
  * Recursive function; computes all possible subsets of concurrent read
  * histories
  */
-void find_subset_rec(trans_t *t, co_t *S, pred_t *preds, array_t *ps, array_t *ra,
+void find_subset_rec(trans_t *t, co_t *S, pred_t *preds,
 		     int s_i, int pred_i, int i, int j, int added)
 {
 	co_cond_t *cond = S[s_i].conds + i;
 	if (j>=0) {
 		if (!hist_c(cond->hists[j], cond->cond)) {
 			// predecessors without cond->hists[j]
-			find_subset_rec(t, S, preds, ps, ra, s_i, pred_i, i,
+			find_subset_rec(t, S, preds, s_i, pred_i, i,
 					j-1, added);
 
 			// predecessors with cond->hists[j]
 			preds[pred_i].cond = cond->cond;
+			CLEAR_FLAGS(preds[pred_i].flags);
+			SET_FLAG(preds[pred_i].flags, PRESET);
 			SET_FLAG(preds[pred_i].flags, HIST_R);
 			preds[pred_i].hist = cond->hists[j];
 			if (pairwise_concurrent(preds, pred_i)) {
-				find_subset_rec(t, S, preds, ps, ra, s_i,
+				find_subset_rec(t, S, preds, s_i,
 						     pred_i+1, i, j-1, added+1);
 			}
 		} else {
 			// Causal history, ignore it
-			find_subset_rec(t, S, preds, ps, ra, s_i, pred_i, i,
+			find_subset_rec(t, S, preds, s_i, pred_i, i,
 					j-1, added);
 		}
 	} else if (added > 0) {
-		set_cond(ps, ra, s_i, cond->cond);
-		find_pred_rec(t, S, preds, ps, ra, s_i+1, pred_i);
+		find_pred_rec(t, S, preds, s_i+1, pred_i);
 	}
 }
 
@@ -386,15 +365,9 @@ void find_pred(trans_t *t, co_t *S)
 		pred_size += max_h;
 	}
 	pred_size += t->readarc_size;
-	array_t *ps = array_new(t->preset_size);
-	ps->count = ps->len;
-	array_t *ra = array_new(t->readarc_size);
-	ra->count = ra->len;
 	pred_t *preds = MYmalloc(sizeof(pred_t) * pred_size);
-	find_pred_rec(t, S, preds, ps, ra, 0, 0);
+	find_pred_rec(t, S, preds, 0, 0);
 	free(preds);
-	array_delete(ps);
-	array_delete(ra);
 }
 
 /**
