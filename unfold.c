@@ -6,6 +6,8 @@
 #include "marking.h"
 #include "unfold.h"
 #include "test.h"
+#include <stdio.h>
+#include "output.h"
 
 net_t *net;	/* stores the net	*/
 unf_t *unf;	/* stores the unfolding */
@@ -105,28 +107,41 @@ void co_array_finalize(co_t *co, int n)
 	free(co);
 }
 
+void co_print(co_t *co)
+{
+	int i, j;
+	for (i = 0; i < co->len; i++) {
+		printf("b%d (%s): ", co->conds[i].cond->num,
+		       co->conds[i].cond->origin->name);
+		for (j = 0; j < co->conds[i].hists_len; j++) {
+			print_ll_history(co->conds[i].hists[j]);
+		}
+	}
+}
+
 /**
  * Computes the intersection of a and b and stores it in b
  */
 void hist_intersect(hist_t **a, int len_a, hist_t ***b, int *len_b)
 {
-	*len_b = 0;
 	hist_t	**last_a = a + len_a,
 		**last_b = *b + *len_b,
-		**cur_b = *b;
+		**cur_a = a, **cur_b = *b, **cur_c = *b;
+	int len_c = 0;
 	
 	// intersects the history arrays
-	while (a < last_a && *b < last_b) {
-		if (*a == **b) {
-			cur_b = a;
-			++a; ++b; ++cur_b; ++(*len_b);
-		} else if (*a < **b) ++a;
-		else ++b;
+	while (cur_a < last_a && cur_b < last_b) {
+		if (*cur_a == *cur_b) {
+			*cur_c = *cur_a;
+			++cur_a; ++cur_b; ++cur_c; ++len_c;
+		} else if (*cur_a < *cur_b) ++cur_a;
+		else ++cur_b;
 	}
-	while (cur_b < last_b) {
-		*cur_b = NULL;
-		++cur_b;
+	while (cur_c < last_b) {
+		*cur_c = NULL;
+		++cur_c;
 	}
+	*len_b = len_c;
 	// TODO: strip the length of the array to the used size
 }
 
@@ -145,10 +160,6 @@ void co_intersect(co_t *a, co_t *b)
 		if (cond_a->cond == cond_b->cond) {
 			// a == b is a condition present in both co-arrays
 			cond_c->cond = cond_a->cond;
-			/*if (cond_b != cond_c && cond_c->hists != NULL) {
-				free(cond_c->hists);
-				cond_b->hists = NULL;
-			} memory leaks?*/
 			
 			// so find the intersection of both histories
 			hist_intersect(cond_a->hists, cond_a->hists_len,
@@ -159,6 +170,7 @@ void co_intersect(co_t *a, co_t *b)
 				cond_c->hists = cond_b->hists;
 				cond_a++; cond_b++; cond_c++; len_c++;
 			} else {
+				free(cond_b->hists);
 				cond_a++;
 				cond_b++;
 			}
@@ -179,7 +191,9 @@ void co_intersect(co_t *a, co_t *b)
 	}
 	b->len = len_c;
 	// TODO: strip the length of the array to the used size
+#ifdef __DEBUG__
 	check_co(b);
+#endif
 }
 
 /**
@@ -392,15 +406,25 @@ void co_insert_co_cond(co_t *co, co_cond_t *cond)
 co_t *co_postset_e(hist_t *hist)
 {
 	array_t *post = hist->e->postset;
-	co_t *co = co_new(post->count);
-	co_cond_t *cond = co->conds, *last_cond = co->conds + co->len;
-	int i = 0;
-	while (cond < last_cond) {
-		cond->cond = g_array_index(post, cond_t *, i);
-		cond->hists_len = 1;
-		cond->hists = MYmalloc(sizeof(hist_t *));
-		*(cond->hists) = hist;
-		cond++; i++;
+	array_t *ra = hist->e->readarcs;
+	co_t *co = co_new(post->count + ra->count);
+	co_cond_t *cond = co->conds;
+	int i = 0, j = 0;
+	while (i < post->count || j < ra->count) {
+		if (i < post->count && (j >= ra->count ||
+		    (array_get(post, i) < array_get(ra, j)))) {
+			cond->cond = (cond_t*)array_get(post, i);
+			cond->hists_len = 1;
+			cond->hists = MYmalloc(sizeof(hist_t *));
+			*(cond->hists) = hist;
+			cond++; i++;
+		} else if (j < ra->count) {
+			cond->cond = (cond_t*)array_get(ra, j);
+			cond->hists_len = 1;
+			cond->hists = MYmalloc(sizeof(hist_t *));
+			*(cond->hists) = hist;
+			cond++; j++;
+		}
 	}
 	return co;
 }
@@ -414,10 +438,14 @@ co_t *co_postset_e(hist_t *hist)
  */
 co_t *co_relation(hist_t *hist)
 {
-	pred_t *pred = hist->pred, *last_pred = hist->pred + hist->pred_n;
+	pred_t *pred = hist->pred;
 	co_t *tmp = NULL;
-	while (pred < last_pred) {
-		if (HAS_FLAG(pred->flags, HIST_C)) {
+	array_t *ps = hist->e->preset, *ra = hist->e->readarcs;
+	int i = 0;
+	while (i < ps->count) {
+		while (pred->cond < (cond_t*)array_get(ps, i)) pred++;
+		while (pred < hist->pred + hist->pred_n
+			&& pred->cond == (cond_t*)array_get(ps, i)) {
 			co_t *co_b = co_union(
 				(co_t*)g_hash_table_lookup(
 					pred->cond->co_private, pred->hist),
@@ -429,25 +457,30 @@ co_t *co_relation(hist_t *hist)
 				co_finalize(co_b);
 			} else
 				tmp = co_b;
-		} else if (HAS_FLAG(pred->flags, HIST_R)) {
-			co_t *co_b = co_union(
-				g_hash_table_lookup(pred->cond->co_private,
-					pred->hist),
-				g_hash_table_lookup(pred->hist->e->co,
-					pred->hist)
-					     );
-			co_t *co_qco_b = co_union(co_b,
-				g_hash_table_lookup(pred->hist->e->qco,
-					pred->hist)
-						 );
-			co_finalize(co_b);
-			if (tmp) {
-				co_intersect(co_qco_b, tmp);
-				co_finalize(co_qco_b);
-			} else
-				tmp = co_qco_b;
+			pred++;
 		}
+		i++;
+	}
+	pred = hist->pred;
+	i = 0;
+	while (i < ra->count) {
+		while (pred->cond < (cond_t*)array_get(ra, i)) pred++;
+		// For read conditions only a causal history is chosen
+		co_t *co_b = co_union(
+			g_hash_table_lookup(pred->cond->co_private, pred->hist),
+			g_hash_table_lookup(pred->hist->e->co, pred->hist)
+				     );
+		co_t *co_qco_b = co_union(co_b,
+			g_hash_table_lookup(pred->hist->e->qco, pred->hist)
+					 );
+		co_finalize(co_b);
+		if (tmp) {
+			co_intersect(co_qco_b, tmp);
+			co_finalize(co_qco_b);
+		} else
+			tmp = co_qco_b;
 		pred++;
+		i++;
 	}
 	co_drop_preset(tmp, hist->e);
 	co_t *co_post = co_postset_e(hist);
@@ -472,14 +505,18 @@ co_t *co_relation(hist_t *hist)
 				g_hash_table_insert(co->cond->co_private, *h,
 						     co_b1);
 			}
-			int i = 0;
-			for (; i < post_e->count; i++) {
-				cond_t *b = g_array_index(post_e, cond_t *, i);
+
+			for (i = 0; i < post_e->count; i++) {
+				cond_t *b = (cond_t *)array_get(post_e, i);
+				co_insert(co_b1, b, hist);
+			}
+
+			for (i = 0; i < ra->count; i++) {
+				cond_t *b = (cond_t *)array_get(ra, i);
 				co_insert(co_b1, b, hist);
 			}
 		}
 	}
-	
 	return result;
 }
 
@@ -541,7 +578,12 @@ void add_history(hist_t *hist)
 	check_co(qco_rel);
 	
 	// Adds the marking of hist to the unfolding
-	g_hash_table_insert(unf->markings, hist->parikh, hist);
+#ifdef __DEBUG__
+	int i;
+	for (i = 0; i < net->numpl; i++)
+		g_assert(hist->marking[i] == 0 || hist->marking[i] == 1);
+#endif
+	g_hash_table_insert(unf->markings, hist->marking, hist);
 }
 
 /*****************************************************************************/
@@ -551,9 +593,9 @@ void add_history(hist_t *hist)
  */
 UNFbool cutoff(hist_t *h1)
 {
-	hist_t *h2 = g_hash_table_lookup(unf->markings, h1->parikh);
+	hist_t *h2 = g_hash_table_lookup(unf->markings, h1->marking);
 	if (h2 != NULL)
-		return (pe_compare(h1, h2) < 0);
+		return (pe_compare(h1, h2) > 0);
 	else
 		return UNF_FALSE;
 }
@@ -615,10 +657,12 @@ void unfold ()
 	pe_init();
 	pe(h0);
 	hist_t *h = NULL;
+	i = 0;
 	while ((h = pe_pop()) != NULL) {
 		if (!cutoff(h)) {
 			add_history(h);
 			pe(h);
+			i++;
 		} else
 			nodelist_push(&cutoff_list, h);
 	}

@@ -25,24 +25,31 @@ net_t* nc_create_net()
 	return net;
 }
 
-guint mark_hash(gconstpointer pvec)
+guint mark_hash(gconstpointer mvec)
 {
-	parikh_t *parikh = (parikh_t *)pvec;
-	guint res1 = 0, res2 = 0, i;
-	for (i = 1; parikh[i].tr_num; i++) {
-		res1 += parikh[i].appearances;
-		res2 += parikh[i].tr_num;
+	guchar *marking = (guchar *)mvec;
+	guint res = 0, i;
+	for (i = 1; i < net->numpl; i++) {
+		res += marking[i] * i;
+#ifdef __DEBUG__
+		g_assert(marking[i] == 0 || marking[i] == 1);
+#endif
 	}
-	return res1 + res2;
+	return res;
 }
 
 gboolean mark_equal(gconstpointer v1, gconstpointer v2)
 {
-	parikh_t *vec1 = (parikh_t*)v1,
-		*vec2 = (parikh_t*)v2;
-	UNFbool eq = parikh_compare(vec1, vec2) == 0;
-	g_assert(!eq);
-	return eq;
+	guchar *vec1 = (guchar*)v1, *vec2 = (guchar*)v2, i;
+	for (i = 0; i < net->numpl; i++) {
+#ifdef __DEBUG__
+		g_assert(vec1[i] == 0 || vec1[i] == 1);
+		g_assert(vec2[i] == 0 || vec2[i] == 1);
+#endif
+		if (vec1[i] != vec2[i])
+			return FALSE;
+	}
+	return TRUE;
 }
 
 /**

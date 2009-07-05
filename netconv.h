@@ -101,8 +101,11 @@ typedef struct hist_t {
 	/// last event in history
 	struct event_t *e;
 	
-	/// marking of the history
+	/// parikh vector of the history
 	struct parikh_t *parikh;
+
+	/// marking of the history
+	guchar *marking;
 	
 	/// the predecessors, ordered by b
 	struct pred_t *pred;

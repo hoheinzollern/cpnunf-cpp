@@ -389,7 +389,7 @@ void find_pred(trans_t *t, co_t *S)
 	array_t *ps = array_new(t->preset_size);
 	ps->count = ps->len;
 	array_t *ra = array_new(t->readarc_size);
-	ps->count = ps->len;
+	ra->count = ra->len;
 	pred_t *preds = MYmalloc(sizeof(pred_t) * pred_size);
 	find_pred_rec(t, S, preds, ps, ra, 0, 0);
 	free(preds);

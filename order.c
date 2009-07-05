@@ -131,6 +131,17 @@ int size_mark_rec(hist_t *hist)
 			size += size_mark_rec(pred->hist);
 			pred++;
 		}
+		int i;
+		array_t *ps = hist->e->preset;
+		for (i = 0; i < ps->count; i++) {
+			place_t *pl = ((cond_t*)array_get(ps, i))->origin;
+			hist->marking[pl->num-1] = 0;
+		}
+		ps = hist->e->postset;
+		for (i = 0; i < ps->count; i++) {
+			place_t *pl = ((cond_t*)array_get(ps, i))->origin;
+			hist->marking[pl->num-1] = 1;
+		}
 		return size;
 	} else
 		return 0;
@@ -152,6 +163,7 @@ void size_mark_clean(hist_t *hist)
 void size_mark(hist_t *hist)
 {
 	parikh_reset();
+	hist->marking = (guchar *)MYcalloc(sizeof(guchar) * net->numpl);
 	int size = size_mark_rec(hist);
 	size_mark_clean(hist);
 	hist->size = size;
