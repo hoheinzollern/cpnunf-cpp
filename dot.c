@@ -7,6 +7,7 @@
 #include "netconv.h"
 #include "unfold.h"
 #include "output.h"
+#include "test.h"
 
 void print_dot_event(event_t *ev)
 {
@@ -47,27 +48,56 @@ void print_dot_condition(cond_t *co)
 	print_dot_readarcs(co);
 }
 
-/*void print_dot_cutoff(trans_t* tr)
+void print_dot_history_rec(FILE *stream, hist_t *h)
 {
-	int num = nc_next_cutoff_event();
-	printf("  e%d [label=\"e%d (%s)\" shape=box style=dashed];\n",
-		num, num, tr->name);
-	int i;
-	for (i = 0; i < ev->preset->count; i++)
-		printf("  b%d -> e%d;\n",
-		       ((cond_t*)array_get(ev->preset, i))->num,
-		       num);
-	for (i = 0; i < ev->readarcs->count; i++)
-		printf("  b%d -> e%d [dir=none];\n",
-		       ((cond_t*)array_get(ev->readarcs, i))->num,
-		       num);
-	for (i = 0; i < ev->postset->count; i++) {
-		cond_t *co = ((cond_t*)array_get(ev->postset, i));
-		printf("  b%d [label=\"b%d (%s)\" shape=circle];\n",
-		       co->num, co->num, co->origin->name);
-		printf("  e%d -> b%d;\n", num, co->num);
+	if (!HAS_FLAG(h->flags, BLACK) && h->e->num!=-1) {
+		SET_FLAG(h->flags, BLACK);
+
+		fprintf(stream, "%d (%s) ", h->e->num, h->e->origin->name);
+		pred_t *pred = h->pred, *last = h->pred + h->pred_n;
+		while (pred < last) {
+			print_dot_history_rec(stream, pred->hist);
+			++pred;
+		}
 	}
-}*/
+}
+
+void dot_history_cleanup(hist_t *h)
+{
+	if (HAS_FLAG(h->flags, BLACK)) {
+		CLEAN_FLAG(h->flags, BLACK);
+
+		pred_t *pred = h->pred, *last = h->pred + h->pred_n;
+		while (pred < last) {
+			dot_history_cleanup(pred->hist);
+			++pred;
+		}
+	}
+}
+
+void print_dot_cutoff(hist_t *h)
+{
+	UNFbool created;
+	event_t *ev = get_or_create_event(h, &created);
+	if (created) {
+		printf("  e%d [label=\"e%d (%s)\" shape=box style=dashed];\n",
+			ev->num, ev->num, ev->origin->name);
+		int i = 0;
+		for (i = 0; i < ev->preset->count; i++) {
+			cond_t *co = (cond_t*)array_get(ev->preset, i);
+			printf("  b%d -> e%d;\n", co->num, ev->num);
+		}
+		for (i = 0; i < ev->readarcs->count; i++) {
+			cond_t *co = (cond_t*)array_get(ev->readarcs, i);
+			printf("  b%d -> e%d [dir=none];\n", co->num, ev->num);
+		}
+	}
+	h->e = ev;
+	fprintf(stderr, "H[%d] = { ", ev->num);
+	print_dot_history_rec(stderr, h);
+	dot_history_cleanup(h);
+	fprintf(stderr, "}\n");
+}
 
 void write_dot_output (unf_t *u, nodelist_t *cutoffs)
 {
@@ -92,11 +122,23 @@ void write_dot_output (unf_t *u, nodelist_t *cutoffs)
 		num_cutoffs++;
 		hist_t *h = ((hist_t *)list->node);
 		fprintf(stderr, "cutoff history for (%s);\n",
-			((trans_t*)h->e)->name);
-		//print_dot_cutoff((trans_t*)h->e);
+			h->e->origin->name);
+		print_dot_cutoff(h);
 	}
 
 	printf("}\n");
 
-	fprintf(stderr, "%d cutoff histories\n", num_cutoffs);
+	fprintf(stderr, "%d cutoff histories\n\n", num_cutoffs);
+
+	fprintf(stderr, "Histories:\n");
+
+	g_hash_table_iter_init (&iter, unf->events);
+	while (g_hash_table_iter_next (&iter, &key, &value)) {
+		event_t *ev = (event_t *)value;
+		GHashTableIter hiter;
+		g_hash_table_iter_init(&hiter, ev->hist);
+		while (g_hash_table_iter_next (&hiter, &key, &value)) {
+			print_ll_history(stderr, (hist_t*)value);
+		}
+	}
 }

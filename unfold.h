@@ -35,6 +35,8 @@ extern void co_array_finalize(co_t *co, int n);
 extern void co_insert(co_t *co, cond_t *cond, hist_t *hist);
 extern void co_insert_co_cond(co_t *co, co_cond_t *cond);
 
+extern event_t *get_or_create_event(hist_t *hist, UNFbool *created);
+
 extern void unfold();	/* the unfolding procedure */
 
 #endif

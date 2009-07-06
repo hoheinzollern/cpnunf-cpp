@@ -15,4 +15,16 @@ void check_co_cond(co_cond_t *cond)
 		g_assert(cond->cond!=NULL);
 		g_assert(cond->hists_len>0);
 		g_assert(cond->hists!=NULL);
+		int i = 0;
+		for (i = 0; i < cond->hists_len; i++) {
+			g_assert(cond->hists[i]->e->num >= -1);
+		}
 }
+
+void pred_check(pred_t *pred, int len)
+{
+	int i;
+	for (i = 0; i< len; i++)
+		g_assert(pred[i].hist->e->num >= -1);
+}
+

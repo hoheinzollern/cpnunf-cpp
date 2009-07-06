@@ -3,6 +3,7 @@
 #include "order.h"
 #include "test.h"
 #include <string.h>
+#include <stdio.h>
 
 /*****************************************************************************/
 
@@ -260,15 +261,15 @@ void pred_sort(pred_t *pred, int pred_n)
 #endif
 }
 
-void find_subset_rec(trans_t *t, co_t *S, pred_t *preds,
+void find_subset_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
 		     int s_i, int pred_i, int i, int j, int added);
-void find_pred_rec(trans_t *t, co_t *S, pred_t *preds, int s_i, int pred_i)
+void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds, int s_i, int pred_i)
 {
 	int i;
 	if (s_i < t->preset_size) {
 		// Only for the preset: find subset of read histories
 		for (i = 0; i < S[s_i].len; i++) {
-			find_subset_rec(t, S, preds, s_i, pred_i, i,
+			find_subset_rec(t, S, h, preds, s_i, pred_i, i,
 					(S[s_i].conds + i)->hists_len-1, 0);
 		}
 	}
@@ -293,22 +294,35 @@ void find_pred_rec(trans_t *t, co_t *S, pred_t *preds, int s_i, int pred_i)
 				preds[pred_i].hist = cond->hists[j];
 				if (hist_c(cond->hists[j], cond->cond) &&
 				    pairwise_concurrent(preds, pred_i))
-					find_pred_rec(t, S, preds,
+					find_pred_rec(t, S, h, preds,
 						      s_i+1, pred_i+1);
 			}
 		}
 	} else {
-		// Predecessor list complete: add history to pe
+		// Predecessor list complete
+		// Check if at least one predecessor has h as history
+#ifdef __DEBUG__
+		pred_check(preds, pred_i);
+#endif
+		for (i = 0; i < pred_i && preds[i].hist != h; i++);
+		if (i == pred_i) // No condition has h as history, abort
+			return;
 
+		// Create the history and add it to the list of possible
+		// extensions
 		hist_t *hist = (hist_t *)MYmalloc(sizeof(hist_t));
 		// Save transition instead of event, it will be added when
 		// adding the history to the unfolding:
-		hist->e = (event_t*)t;
+		hist->e = MYcalloc(sizeof(event_t));
+		hist->e->origin = t;
 		hist->flags = 0;
 		hist->pred_n = pred_i;
 		hist->pred = MYmalloc(sizeof(pred_t) * hist->pred_n);
 		memcpy(hist->pred, preds, sizeof(pred_t) * hist->pred_n);
 		pred_sort(hist->pred, hist->pred_n);
+#ifdef __DEBUG__
+		pred_check(hist->pred, hist->pred_n);
+#endif
 		size_mark(hist);
 		// Add the newly created history to the list of possible
 		// extensions
@@ -320,14 +334,14 @@ void find_pred_rec(trans_t *t, co_t *S, pred_t *preds, int s_i, int pred_i)
  * Recursive function; computes all possible subsets of concurrent read
  * histories
  */
-void find_subset_rec(trans_t *t, co_t *S, pred_t *preds,
+void find_subset_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
 		     int s_i, int pred_i, int i, int j, int added)
 {
 	co_cond_t *cond = S[s_i].conds + i;
 	if (j>=0) {
 		if (!hist_c(cond->hists[j], cond->cond)) {
 			// predecessors without cond->hists[j]
-			find_subset_rec(t, S, preds, s_i, pred_i, i,
+			find_subset_rec(t, S, h, preds, s_i, pred_i, i,
 					j-1, added);
 
 			// predecessors with cond->hists[j]
@@ -337,16 +351,16 @@ void find_subset_rec(trans_t *t, co_t *S, pred_t *preds,
 			SET_FLAG(preds[pred_i].flags, HIST_R);
 			preds[pred_i].hist = cond->hists[j];
 			if (pairwise_concurrent(preds, pred_i)) {
-				find_subset_rec(t, S, preds, s_i,
+				find_subset_rec(t, S, h, preds, s_i,
 						     pred_i+1, i, j-1, added+1);
 			}
 		} else {
 			// Causal history, ignore it
-			find_subset_rec(t, S, preds, s_i, pred_i, i,
+			find_subset_rec(t, S, h, preds, s_i, pred_i, i,
 					j-1, added);
 		}
 	} else if (added > 0) {
-		find_pred_rec(t, S, preds, s_i+1, pred_i);
+		find_pred_rec(t, S, h, preds, s_i+1, pred_i);
 	}
 }
 
@@ -354,7 +368,7 @@ void find_subset_rec(trans_t *t, co_t *S, pred_t *preds,
  * Find all possible pairwise concurrent sets of predecessors for a new history;
  * once one set is found add it to possible extensions
  */
-void find_pred(trans_t *t, co_t *S)
+void find_pred(trans_t *t, co_t *S, hist_t *h)
 {
 	int i, j, pred_size = 0;
 	for (i = 0; i < t->preset_size; i++) {
@@ -366,7 +380,7 @@ void find_pred(trans_t *t, co_t *S)
 	}
 	pred_size += t->readarc_size;
 	pred_t *preds = MYmalloc(sizeof(pred_t) * pred_size);
-	find_pred_rec(t, S, preds, 0, 0);
+	find_pred_rec(t, S, h, preds, 0, 0);
 	free(preds);
 }
 
@@ -389,7 +403,8 @@ void pe (hist_t *h)
 		co_t *S = test_trans(tr, co);
 		if (S != NULL) {
 			// *t U _t_ is a subset of im(co)
-			find_pred(tr, S);
+			fprintf(stderr, "Testing %s\n", tr->name);
+			find_pred(tr, S, h);
 			co_array_finalize(S, tr->preset_size +
 					  tr->readarc_size);
 		}

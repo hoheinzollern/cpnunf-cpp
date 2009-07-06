@@ -596,16 +596,14 @@ co_t *qco_relation(hist_t *hist)
 	return tmp;
 }
 
-/**
- * Adds an history to the unfolding, then finds new possible estensions
- */
-void add_history(hist_t *hist)
+event_t *get_or_create_event(hist_t *hist, UNFbool *created)
 {
 	// Find if there is already the event in the unfolding whose
 	// image in the original net is t; if not, create it.
 	array_t *events = hist->pred->cond->postset;
 	event_t *e = NULL;
-	trans_t *t = (trans_t*)hist->e;
+	trans_t *t = hist->e->origin;
+	*created = UNF_FALSE;
 	int i = 0;
 	while (i < events->count &&
 	       ((event_t*)array_get(events, i))->origin != t)
@@ -623,12 +621,24 @@ void add_history(hist_t *hist)
 		}
 		e = nc_event_new(t, ps, ra);
 		nc_add_event(e);
+		*created = UNF_TRUE;
 	} else
 		e = array_get(events, i);
+	return e;
+}
+
+/**
+ * Adds an history to the unfolding, then finds new possible estensions
+ */
+void add_history(hist_t *hist)
+{
+	UNFbool created;
+	event_t *e = get_or_create_event(hist, &created);
+	free(hist->e);
 	hist->e = e;
 
 	// Add history to the unfolding
-	g_hash_table_insert(e->hist, hist, hist);
+	g_hash_table_insert(hist->e->hist, hist, hist);
 	
 	// Computes co and qco relations
 	co_t *co_rel = co_relation(hist),
@@ -637,14 +647,15 @@ void add_history(hist_t *hist)
 	g_hash_table_insert(hist->e->co, hist, co_rel);
 	g_hash_table_insert(hist->e->qco, hist, qco_rel);
 
+#ifdef __DEBUG__
 	check_co(co_rel);
 	check_co(qco_rel);
-	
-	// Adds the marking of hist to the unfolding
-#ifdef __DEBUG__
+	int i;
 	for (i = 0; i < net->numpl; i++)
 		g_assert(hist->marking[i] == 0 || hist->marking[i] == 1);
 #endif
+
+	// Adds the marking of hist to the unfolding
 	g_hash_table_insert(unf->markings, hist->marking, hist);
 }
 
@@ -656,10 +667,20 @@ void add_history(hist_t *hist)
 UNFbool cutoff(hist_t *h1)
 {
 	hist_t *h2 = g_hash_table_lookup(unf->markings, h1->marking);
-	if (h2 != NULL)
+	if (h2 != NULL) {
+		int i;
+		fprintf(stderr, "H[%s]: ", h1->e->origin->name);
+		for (i = 0; i < net->numpl; i++)
+			fprintf(stderr, "%d", h1->marking[i]);
+		fprintf(stderr, "\n");
+		fprintf(stderr, "H[e%d (%s)]: ", h2->e->num, h2->e->origin->name);
+		for (i = 0; i < net->numpl; i++)
+			fprintf(stderr, "%d", h2->marking[i]);
+		fprintf(stderr, "\n\n");
 		return (pe_compare(h1, h2) > 0);
-	else
+	} else {
 		return UNF_FALSE;
+	}
 }
 
 /**

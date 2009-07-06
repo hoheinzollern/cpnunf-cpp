@@ -119,29 +119,32 @@ int parikh_compare (parikh_t *pv1, parikh_t *pv2)
 		return pv1->tr_num - pv2->tr_num;
 }
 
-int size_mark_rec(hist_t *hist)
+int size_mark_rec(hist_t *hist, guchar *marking)
 {
-	if (!HAS_FLAG(hist->flags, BLACK) && hist->e->num != -1) {
+	if (hist->e->num == -1) {
+		nodelist_t *n = unf->m0;
+		for (; n != NULL; n = n->next)
+			marking[((place_t*)n->node)->num-1] = 1;
+		return 0;
+	} else if (!HAS_FLAG(hist->flags, BLACK)) {
 		SET_FLAG(hist->flags, BLACK);
 		parikh_add(hist->e->origin->num);
-		int size = 1;
+		fprintf(stderr, "%s ", hist->e->origin->name);
 
+		int size = 1;
 		pred_t *pred = hist->pred, *last = hist->pred + hist->pred_n;
 		while (pred < last) {
-			size += size_mark_rec(pred->hist);
+			size += size_mark_rec(pred->hist, marking);
 			pred++;
 		}
-		int i;
-		array_t *ps = hist->e->preset;
-		for (i = 0; i < ps->count; i++) {
-			place_t *pl = ((cond_t*)array_get(ps, i))->origin;
-			hist->marking[pl->num-1] = 0;
-		}
-		ps = hist->e->postset;
-		for (i = 0; i < ps->count; i++) {
-			place_t *pl = ((cond_t*)array_get(ps, i))->origin;
-			hist->marking[pl->num-1] = 1;
-		}
+
+		nodelist_t *n = hist->e->origin->preset;
+		for (; n != NULL; n = n->next)
+			marking[((place_t*)n->node)->num-1] = 0;
+		n = hist->e->origin->postset;
+		for (; n != NULL; n = n->next)
+			marking[((place_t*)n->node)->num-1] = 1;
+
 		return size;
 	} else
 		return 0;
@@ -162,30 +165,13 @@ void size_mark_clean(hist_t *hist)
 
 void size_mark(hist_t *hist)
 {
+	fprintf(stderr, "H:");
 	parikh_reset();
 	hist->marking = (guchar *)MYcalloc(sizeof(guchar) * net->numpl);
-	if (hist->e->num != -1) {
-		int size = 1;
-		pred_t *pred = hist->pred, *last = hist->pred + hist->pred_n;
-		while (pred < last) {
-			size += size_mark_rec(pred->hist);
-			pred++;
-		}
-		pred = hist->pred;
-		while (pred < last) {
-			size_mark_clean(pred->hist);
-			pred++;
-		}
-		nodelist_t *ps = ((trans_t*)hist->e)->postset;
-		for (; ps; ps = ps->next) {
-			place_t *pl = (place_t*)ps->node;
-			hist->marking[pl->num-1] = 1;
-		}
-		hist->size = size;
-	} else {
-		hist->size = 0;
-	}
+	hist->size = size_mark_rec(hist, hist->marking);
 	hist->parikh = parikh_save();
+	size_mark_clean(hist);
+	fprintf(stderr, "\n");
 }
 
 /**

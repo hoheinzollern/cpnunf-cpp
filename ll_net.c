@@ -142,7 +142,7 @@ void write_ll_net (unf_t *u, nodelist_t *cutoffs, UNFbool hist)
 		num_cutoffs++;
 		hist_t *h = ((hist_t *)list->node);
 		fprintf(stderr, "cutoff history for (%s);\n",
-			((trans_t*)h->e)->name);
+			h->e->origin->name);
 	}
 
 	fprintf(stderr, "%d cutoff histories\n", num_cutoffs);
