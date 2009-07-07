@@ -256,9 +256,28 @@ void pred_sort(pred_t *pred, int pred_n)
 	}
 #ifdef __DEBUG__
 	for (i = 0; i < pred_n-1; i++) {
-		g_assert(pred[i].cond < pred[i+1].cond);
+		g_assert(pred[i].cond <= pred[i+1].cond);
 	}
 #endif
+}
+
+void printhrec(hist_t *h)
+{
+	if (h->e->num != -1) {
+		pred_t *pred = h->pred, *last = h->pred + h->pred_n;
+		while (pred < last) {
+			printhrec(pred->hist);
+			pred++;
+		}
+		fprintf(stderr, "%s ", h->e->origin->name);
+	}
+}
+
+void printh(hist_t *h)
+{
+	fprintf(stderr, "Found H[%s] = {", h->e->origin->name);
+	printhrec(h);
+	fprintf(stderr, "}\n");
 }
 
 void find_subset_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
@@ -322,7 +341,9 @@ void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds, int s_i, int p
 		pred_sort(hist->pred, hist->pred_n);
 #ifdef __DEBUG__
 		pred_check(hist->pred, hist->pred_n);
+		printh(hist);
 #endif
+
 		size_mark(hist);
 		// Add the newly created history to the list of possible
 		// extensions

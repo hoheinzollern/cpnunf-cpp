@@ -185,7 +185,7 @@ void co_intersect(co_t *a, co_t *b)
 		cond_b->cond = NULL;
 		cond_b->hists_len = 0;
 		if (cond_b->hists != NULL)
-			free(cond_c->hists);
+			free(cond_b->hists);
 		cond_b->hists = NULL;
 		cond_b++;
 	}
@@ -249,7 +249,7 @@ void co_cond_copy(co_cond_t *dst, co_cond_t *src)
 void hist_union(hist_t **h1, int len_h1, hist_t **h2, int len_h2,
 		hist_t ***h3, int *len_h3)
 {
-	*h3 = MYmalloc(sizeof(hist_t *) * (len_h1 + len_h2));
+	*h3 = MYmalloc(sizeof(hist_t **) * (len_h1 + len_h2));
 	int i=0, j=0, k=0;
 	while (i < len_h1 && j < len_h2) {
 		if (h1[i] < h2[j]) {
@@ -381,18 +381,21 @@ void co_insert(co_t *co, cond_t *cond, hist_t *hist)
 		// cond is already found in the co_structure, so 
 		// just insert the history
 		int j = 0;
-		while (j < conds[i].hists_len && hist < conds[i].hists[j])
+		while (j < conds[i].hists_len && conds[i].hists[j] < hist)
 			j++;
 		if (j >= conds[i].hists_len || hist != conds[i].hists[j]) {
 			// The history is not found, so add it to the array
-			hist_t **hists = MYmalloc(conds[i].hists_len+1);
+			hist_t **hists = MYmalloc(sizeof(hist_t*) * (conds[i].hists_len+1));
 			memcpy(hists, conds[i].hists, sizeof(hist_t *) * j);
-			memcpy(hists + j + 1, conds[i].hists + j,
-				sizeof(hist_t *) * (conds[i].hists_len-j+1));
 			hists[j] = hist;
+			memcpy(hists + j + 1, conds[i].hists + j,
+				sizeof(hist_t *) * (conds[i].hists_len-j));
 			free(conds[i].hists);
 			conds[i].hists = hists;
 			conds[i].hists_len++;
+#ifdef __DEBUG__
+			check_co(co);
+#endif
 		}
 	} else {
 		// cond is not found, insert it in the co_structure
@@ -400,12 +403,18 @@ void co_insert(co_t *co, cond_t *cond, hist_t *hist)
 		if (len > 0) {
 			memcpy(conds, co->conds, sizeof(co_cond_t) * i);
 			memcpy(conds + i + 1, co->conds + i,
-				sizeof(co_cond_t) * (len-i+1));
+				sizeof(co_cond_t) * (len-i));
+			free(co->conds);
 		}
 		conds[i].cond = cond;
 		conds[i].hists_len = 1;
 		conds[i].hists = MYmalloc(sizeof(hist_t *));
 		conds[i].hists[0] = hist;
+		co->conds = conds;
+		co->len = len + 1;
+#ifdef __DEBUG__
+		check_co(co);
+#endif
 	}
 }
 
@@ -468,6 +477,42 @@ co_t *co_postset_e(hist_t *hist)
 	return co;
 }
 
+co_t *get_co(cond_t *cond, hist_t *hist)
+{
+	int j;
+	co_t *tmp, *co_b;
+	co_t *co = co_union(
+		(co_t*)g_hash_table_lookup(
+			cond->co_private, hist),
+		(co_t*)g_hash_table_lookup(
+			hist->e->co, hist)
+	);
+	for (j = 0; j < cond->readarcs->count; j++) {
+		co_b = (co_t*)g_hash_table_lookup(
+			((event_t*)array_get(cond->readarcs, j))->co, hist);
+		if (co_b) {
+			tmp = co;
+			co = co_union(co, co_b);
+			co_finalize(tmp);
+		}
+	}
+	return co;
+}
+
+void print_co(co_t *co, hist_t *h)
+{
+	int i, j;
+	fprintf(stderr, "e%d (%s)->co: ", h->e->num, h->e->origin->name);
+	for (i = 0; i < co->len; i++) {
+		for (j = 0; j < co->conds[i].hists_len; j++) {
+			fprintf(stderr, "<b%d (%s), H[e%d]> ",
+				co->conds[i].cond->num, co->conds[i].cond->origin->name,
+				co->conds[i].hists[j]->e->num);
+		}
+	}
+	fprintf(stderr, "\n");
+}
+
 /**
  * Computes the co-relation given an enriched event. See theory at section
  * "Keeping co and qco-relations" for details.
@@ -485,12 +530,7 @@ co_t *co_relation(hist_t *hist)
 		while (pred->cond < (cond_t*)array_get(ps, i)) pred++;
 		while (pred < hist->pred + hist->pred_n
 			&& pred->cond == (cond_t*)array_get(ps, i)) {
-			co_t *co_b = co_union(
-				(co_t*)g_hash_table_lookup(
-					pred->cond->co_private, pred->hist),
-				(co_t*)g_hash_table_lookup(
-					pred->hist->e->co, pred->hist)
-			);
+			co_t *co_b = get_co(pred->cond, pred->hist);
 			if (tmp) {
 				co_intersect(co_b, tmp);
 				co_finalize(co_b);
@@ -505,10 +545,7 @@ co_t *co_relation(hist_t *hist)
 	while (i < ra->count) {
 		while (pred->cond < (cond_t*)array_get(ra, i)) pred++;
 		// For read conditions only a causal history is chosen
-		co_t *co_b = co_union(
-			g_hash_table_lookup(pred->cond->co_private, pred->hist),
-			g_hash_table_lookup(pred->hist->e->co, pred->hist)
-				     );
+		co_t *co_b = get_co(pred->cond, pred->hist);
 		co_t *co_qco_b = co_union(co_b,
 			g_hash_table_lookup(pred->hist->e->qco, pred->hist)
 					 );
@@ -526,10 +563,12 @@ co_t *co_relation(hist_t *hist)
 	co_t *result = co_union(tmp, co_post);
 #ifdef __DEBUG__
 	check_co(tmp);
+	check_co(co_post);
 	check_co(result);
 #endif
 	co_finalize(tmp);
 	co_finalize(co_post);
+	print_co(result, hist);
 	
 	// Adds the reverse side of the relation:
 	array_t *post_e = hist->e->postset;
@@ -556,9 +595,6 @@ co_t *co_relation(hist_t *hist)
 			}
 		}
 	}
-	fprintf(stderr, "co[e%d]:\n", hist->e->num);
-	co_fprint(stderr, result);
-	fprintf(stderr, "\n\n");
 	return result;
 }
 
@@ -580,10 +616,7 @@ co_t *qco_relation(hist_t *hist)
 	}
 	pred = hist->pred;
 	while (pred < last_pred) {
-		co_t *co_b = co_union(
-			g_hash_table_lookup(pred->hist->e->co, pred->hist),
-			g_hash_table_lookup(pred->cond->co_private, pred->hist)
-		);
+		co_t *co_b = get_co(pred->cond, pred->hist);
 		co_t *qco_b =
 			g_hash_table_lookup(pred->hist->e->qco, pred->hist);
 		co_t *co_qco_b = co_union(co_b, qco_b);
