@@ -204,24 +204,26 @@ UNFbool pairwise_concurrent(pred_t *preds, int j)
 		// TODO: binary search to accelerate this process
 		int k, l;
 		UNFbool found = UNF_FALSE;
-		for (k = 0; !found && k < co_common->len; k++) {
-			if (co_common->conds[k].cond == preds[j].cond) {
-				for (l = 0; !found &&
-					l < co_common->conds[k].hists_len; l++)
-					if (co_common->conds[k].hists[l] ==
-					    preds[j].hist)
-						found = UNF_TRUE;
+		if (co_common != NULL)
+			for (k = 0; !found && k < co_common->len; k++) {
+				if (co_common->conds[k].cond == preds[j].cond) {
+					for (l = 0; !found &&
+						l < co_common->conds[k].hists_len; l++)
+						if (co_common->conds[k].hists[l] ==
+						preds[j].hist)
+							found = UNF_TRUE;
+				}
 			}
-		}
-		for (k = 0; !found && k < co_private->len; k++) {
-			if (co_private->conds[k].cond == preds[j].cond) {
-				for (l = 0; !found &&
-					l < co_private->conds[k].hists_len; l++)
-					if (co_private->conds[k].hists[l] ==
-					    preds[j].hist)
-						found = UNF_TRUE;
+		if (co_private != NULL)
+			for (k = 0; !found && k < co_private->len; k++) {
+				if (co_private->conds[k].cond == preds[j].cond) {
+					for (l = 0; !found &&
+						l < co_private->conds[k].hists_len; l++)
+						if (co_private->conds[k].hists[l] ==
+						preds[j].hist)
+							found = UNF_TRUE;
+				}
 			}
-		}
 		if (!found) cont = UNF_FALSE;
 		--j;
 	}
