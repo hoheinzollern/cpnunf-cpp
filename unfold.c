@@ -633,15 +633,19 @@ event_t *get_or_create_event(hist_t *hist, UNFbool *created)
 {
 	// Find if there is already the event in the unfolding whose
 	// image in the original net is t; if not, create it.
-	array_t *events = hist->pred->cond->postset;
+	array_t *post = hist->pred->cond->postset,
+		*read = hist->pred->cond->readarcs;
 	event_t *e = NULL;
 	trans_t *t = hist->e->origin;
 	*created = UNF_FALSE;
-	int i = 0;
-	while (i < events->count &&
-	       ((event_t*)array_get(events, i))->origin != t)
+	int i = 0, j = 0;
+	while (i < post->count &&
+	       ((event_t*)array_get(post, i))->origin != t)
 		i++;
-	if (i >= events->count) {
+	while (j < read->count &&
+	       ((event_t*)array_get(read, j))->origin != t)
+		j++;
+	if (i >= post->count && j >= read->count) {
 		// Event not found, create it.
 		array_t *ps = array_new(0), *ra = array_new(0);
 		pred_t *pred = hist->pred, *last = hist->pred + hist->pred_n;
@@ -655,8 +659,11 @@ event_t *get_or_create_event(hist_t *hist, UNFbool *created)
 		e = nc_event_new(t, ps, ra);
 		nc_add_event(e);
 		*created = UNF_TRUE;
-	} else
-		e = array_get(events, i);
+	} else if (i < post->count) {
+		e = array_get(post, i);
+	} else {
+		e = array_get(read, j);
+	}
 	return e;
 }
 
