@@ -713,7 +713,10 @@ UNFbool cutoff(hist_t *h1)
 		for (i = 0; i < net->numpl; i++)
 			fprintf(stderr, "%d", h1->marking[i]);
 		fprintf(stderr, "\n");
-		fprintf(stderr, "H[e%d (%s)]: ", h2->e->num, h2->e->origin->name);
+		if (h2->e->num != -1)
+			fprintf(stderr, "H[e%d (%s)]: ", h2->e->num, h2->e->origin->name);
+		else
+			fprintf(stderr, "H[e%d]: ", h2->e->num	);
 		for (i = 0; i < net->numpl; i++)
 			fprintf(stderr, "%d", h2->marking[i]);
 		fprintf(stderr, "\n\n");
@@ -772,6 +775,7 @@ void unfold ()
 	}
 	g_hash_table_insert(ev->co, h0, co);
 	g_hash_table_insert(ev->qco, h0, co_new(0));
+	g_hash_table_insert(unf->markings, h0->marking, h0);
 	
 	// Unfolding:
 	pe_init();
