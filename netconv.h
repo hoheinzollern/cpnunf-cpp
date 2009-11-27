@@ -26,7 +26,7 @@
 #define PRESET 0x04
 #define CONTEXT 0x08
 
-#define BLACK 0x01
+#define BLACK 0x10
 
 typedef unsigned char uchar;
 
