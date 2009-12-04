@@ -222,6 +222,39 @@ void co_drop_preset(co_t *co, event_t *ev)
 #endif
 }
 
+void co_drop_context(co_t *co, event_t *ev)
+{
+	array_t *ra = ev->readarcs;
+	int i = 0, cond = 0;
+	while (i < ra->count && cond < co->len) {
+		if ((cond_t*)array_get(ra, i) == co->conds[cond].cond) {
+			// remove causal histories
+			int j = 0;
+			for (; j < co->conds[cond].hists_len; j++) {
+				if (hist_c(co->conds[cond].hists[j], co->conds[cond].cond)) {
+					if (co->conds[cond].hists_len > 1) {
+						memmove(co->conds[cond].hists + j, co->conds[cond].hists + j + 1,
+								sizeof(hist_t *) * (co->conds[cond].hists_len - j - 1));
+						co->conds[cond].hists_len--;
+					} else {
+						free(co->conds[cond].hists);
+						memmove(co->conds + cond, co->conds + cond + 1,
+								sizeof(co_cond_t)*(co->len - cond - 1));
+						co->len--;
+					}
+				}
+			}
+			cond++; i++;
+		} else {
+			cond++;
+		}
+	}
+#ifdef __DEBUG__
+	for (i = 0; i < co->len; i++)
+		g_assert(co->conds[i].hists!=NULL);
+#endif
+}
+
 /**
  * Copies a co-condition from src to dst
  */
@@ -418,6 +451,9 @@ void co_insert(co_t *co, cond_t *cond, hist_t *hist)
 	}
 }
 
+/**
+  * Inserts a new pair <b, H> into the co-structure co
+  */
 void co_insert_co_cond(co_t *co, co_cond_t *cond)
 {
 	co_cond_t *conds = co->conds;
@@ -499,7 +535,10 @@ co_t *get_co(cond_t *cond, hist_t *hist)
 	return co;
 }
 
-void print_co(co_t *co, hist_t *h)
+/**
+  *
+  */
+void print_co_qco(co_t *co, co_t *qco, hist_t *h)
 {
 	int i, j;
 	fprintf(stderr, "e%d (%s)->co: ", h->e->num, h->e->origin->name);
@@ -508,6 +547,15 @@ void print_co(co_t *co, hist_t *h)
 			fprintf(stderr, "<b%d (%s), H[e%d]> ",
 				co->conds[i].cond->num, co->conds[i].cond->origin->name,
 				co->conds[i].hists[j]->e->num);
+		}
+	}
+	fprintf(stderr, "\n");
+	fprintf(stderr, "e%d (%s)->qco: ", h->e->num, h->e->origin->name);
+	for (i = 0; i < qco->len; i++) {
+		for (j = 0; j < qco->conds[i].hists_len; j++) {
+			fprintf(stderr, "<b%d (%s), H[e%d]> ",
+				qco->conds[i].cond->num, qco->conds[i].cond->origin->name,
+				qco->conds[i].hists[j]->e->num);
 		}
 	}
 	fprintf(stderr, "\n");
@@ -543,19 +591,21 @@ co_t *co_relation(hist_t *hist)
 	pred = hist->pred;
 	i = 0;
 	while (i < ra->count) {
-		while (pred->cond < (cond_t*)array_get(ra, i)) pred++;
+		while (pred->cond < (cond_t *)array_get(ra, i)) pred++;
 		// For read conditions only a causal history is chosen
-		co_t *co_b = get_co(pred->cond, pred->hist);
-		co_t *co_qco_b = co_union(co_b,
-			g_hash_table_lookup(pred->hist->e->qco, pred->hist)
-					 );
-		co_finalize(co_b);
-		if (tmp) {
-			co_intersect(co_qco_b, tmp);
-			co_finalize(co_qco_b);
-		} else
-			tmp = co_qco_b;
-		pred++;
+		if (pred < hist->pred + hist->pred_n) {
+			co_t *co_b = get_co(pred->cond, pred->hist);
+			co_t *co_qco_b = co_union(co_b,
+				g_hash_table_lookup(pred->hist->e->qco, pred->hist)
+						 );
+			co_finalize(co_b);
+			if (tmp) {
+				co_intersect(co_qco_b, tmp);
+				co_finalize(co_qco_b);
+			} else
+				tmp = co_qco_b;
+			pred++;
+		}
 		i++;
 	}
 	co_drop_preset(tmp, hist->e);
@@ -568,7 +618,6 @@ co_t *co_relation(hist_t *hist)
 #endif
 	co_finalize(tmp);
 	co_finalize(co_post);
-	print_co(result, hist);
 	
 	// Adds the reverse side of the relation:
 	array_t *post_e = hist->e->postset;
@@ -626,9 +675,14 @@ co_t *qco_relation(hist_t *hist)
 		pred++;
 	}
 	co_drop_preset(tmp, hist->e);
+
 	return tmp;
 }
 
+/**
+  * Returns the correct event to which hist belongs, checking whether it
+  * already exists, creating it otherwise.
+  */
 event_t *get_or_create_event(hist_t *hist, UNFbool *created)
 {
 	// Find if there is already the event in the unfolding whose
@@ -681,8 +735,10 @@ void add_history(hist_t *hist)
 	g_hash_table_insert(hist->e->hist, hist, hist);
 	
 	// Computes co and qco relations
-	co_t *co_rel = co_relation(hist),
-	    *qco_rel = qco_relation(hist);
+	co_t *qco_rel = qco_relation(hist),
+		  *co_rel = co_relation(hist);
+
+	print_co_qco(co_rel, qco_rel, hist);
 	
 	g_hash_table_insert(hist->e->co, hist, co_rel);
 	g_hash_table_insert(hist->e->qco, hist, qco_rel);

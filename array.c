@@ -20,6 +20,7 @@ array_t *array_new(int len)
 	return array;
 }
 
+/// Returns a copy of the array
 array_t *array_copy(array_t *array)
 {
 	array_t *res = (array_t *)MYmalloc(sizeof(array_t));
@@ -118,6 +119,7 @@ void array_sort(array_t *array)
 	}
 }
 
+/// @return UNF_TRUE if array is ordered, UNF_FALSE otherwise
 UNFbool array_ordered(array_t *array)
 {
 	UNFbool ordered = UNF_TRUE;

@@ -236,11 +236,9 @@ UNFbool pairwise_concurrent(pred_t *preds, int j)
  * @arg cond the condition
  * @return the result of the test
  */
-UNFbool hist_c(hist_t *hist, cond_t *cond)
+inline UNFbool hist_c(hist_t *hist, cond_t *cond)
 {
-	if (cond->pre_ev == hist->e)
-		return UNF_TRUE;
-	return UNF_FALSE;
+	return (cond->pre_ev == hist->e);
 }
 
 /**
@@ -271,11 +269,13 @@ void printhrec(hist_t *h)
 {
 	if (h->e->num != -1) {
 		pred_t *pred = h->pred, *last = h->pred + h->pred_n;
+		fprintf(stderr, "{");
 		while (pred < last) {
 			printhrec(pred->hist);
+			fprintf(stderr, " %s ", pred->cond->origin->name);
 			pred++;
 		}
-		fprintf(stderr, "%s ", h->e->origin->name);
+		fprintf(stderr, "} %s", h->e->origin->name);
 	}
 }
 
@@ -291,30 +291,30 @@ void printh(hist_t *h)
   * checks that if a condition b read by e is consumed in the newly created
   * history h' also the history associated to e is also present in the list of
   * predecessors of h' in a pair with b (only consumed read places are
-  * concerned, so we just take the cri array instead of the entire list of
+  * concerned, so we just take the crh array instead of the entire list of
   * predecessors for h')
   */
-UNFbool closed_rec(hist_t *h, pred_t *cri, int cri_n) {
+UNFbool closed_rec(hist_t *h, pred_t *crh, int crh_n) {
 	if (!HAS_FLAG(h->flags, BLACK)) {
 		int i, j = 0;
 		array_t *ra = h->e->readarcs;
 		UNFbool sent = UNF_TRUE;
 		for (i = 0; i < ra->count && sent; i++) {
-			while (j < cri_n && cri[j].cond < (cond_t *)ra->data[i]) j++;
-			if (j < cri_n && cri[j].cond == ra->data[i]) {
+			while (j < crh_n && crh[j].cond < (cond_t *)ra->data[i]) j++;
+			if (j < crh_n && crh[j].cond == ra->data[i]) {
 				// Consumed condition found in the set of consumed read histories:
 				// check for the presence of h in c.r.i.
 				sent = UNF_FALSE;
 				int k = j;
-				while (k < cri_n && cri[k].cond == cri[j].cond && cri[k].hist != h)
+				while (k < crh_n && crh[k].cond == crh[j].cond && crh[k].hist != h)
 					k++;
-				if (k < cri_n && cri[k].cond == cri[j].cond && cri[k].hist == h)
+				if (k < crh_n && crh[k].cond == crh[j].cond && crh[k].hist == h)
 					sent = UNF_TRUE;
 			}
 		}
 		if (sent) {
 			for (i = 0; i < h->pred_n && sent; i++)
-				sent = closed_rec(h->pred[i].hist, cri, cri_n);
+				sent = closed_rec(h->pred[i].hist, crh, crh_n);
 			return sent;
 		} else
 			return UNF_FALSE;
@@ -326,42 +326,57 @@ UNFbool closed_rec(hist_t *h, pred_t *cri, int cri_n) {
   * cleans h from BLACK flags used by closed_rec
   */
 void closed_clean(hist_t *h) {
-	CLEAN_FLAG(h->flags, BLACK);
-	int i;
-	for (i = 0; i < h->pred_n; i++)
-		closed_clean(h->pred[i].hist);
+	if (HAS_FLAG(h->flags, BLACK)) {
+		CLEAN_FLAG(h->flags, BLACK);
+		int i;
+		for (i = 0; i < h->pred_n; i++)
+			closed_clean(h->pred[i].hist);
+	}
 }
 
 /**
   * checks whether h is a closed history.
   * @arg h the history to be checked for closure
-  * @arg cri the set of consumed read histories in h
-  * @arg cri_n the length of cri
+  * @arg crh the set of consumed read histories in h
+  * @arg crh_n the length of crh
   * @return the closure check result
   */
-UNFbool closed(hist_t *h, pred_t *cri, int cri_n) {
+UNFbool closed(hist_t *h, pred_t *crh, int crh_n) {
 	UNFbool sent = UNF_TRUE;
 	int i;
 	for (i = 0; i < h->pred_n && sent; i++)
-		sent = closed_rec(h->pred[i].hist, cri, cri_n);
+		sent = closed_rec(h->pred[i].hist, crh, crh_n);
 	for (i = 0; i < h->pred_n; i++)
 		closed_clean(h->pred[i].hist);
-	free(cri);
+	free(crh);
 	return sent;
 }
 
 void find_subset_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
-                     pred_t *cons_read_hists, int s_i, int pred_i, int cri_i,
+					 pred_t *cons_read_hists, int s_i, int pred_i, int crh_i,
                      int i, int j, int added);
+
+/**
+  * Generates all possible tubsets of predecessors, checking at each step that
+  * the newly inserted predecessor is concurrent with all the others already
+  * present in the array.
+  * @arg t the transition to be tested, counter-image of the event in the
+  *        unfolding (yet to be found)
+  * @arg S an array of co-structures, each co-structure represents the counter-
+  *        image of a place in \f$\,^\bullet tr \cup \underline{tr}\f$.
+  */
 void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
-                   pred_t *cons_read_hists, int s_i, int pred_i, int cri_i)
+				   pred_t *cons_read_hists, int s_i, int pred_i, int crh_i)
 {
 	int i;
 	if (s_i < t->preset_size) {
 		// Only for the preset: find subset of read histories
 		for (i = 0; i < S[s_i].len; i++) {
-                        find_subset_rec(t, S, h, preds, cons_read_hists, s_i, pred_i, cri_i, i,
-					(S[s_i].conds + i)->hists_len-1, 0);
+#ifdef __DEBUG__
+			if (i < S[s_i].len -1) g_assert(S[s_i].conds[i].cond < S[s_i].conds[i+1].cond);
+#endif
+			find_subset_rec(t, S, h, preds, cons_read_hists, s_i, pred_i, crh_i, i,
+							S[s_i].conds[i].hists_len - 1, 0);
 		}
 	}
 
@@ -385,8 +400,8 @@ void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
 				preds[pred_i].hist = cond->hists[j];
 				if (hist_c(cond->hists[j], cond->cond) &&
 				    pairwise_concurrent(preds, pred_i))
-                                        find_pred_rec(t, S, h, preds, cons_read_hists,
-                                                      s_i+1, pred_i+1, cri_i);
+						find_pred_rec(t, S, h, preds, cons_read_hists,
+									  s_i+1, pred_i+1, crh_i);
 			}
 		}
 	} else {
@@ -412,22 +427,22 @@ void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
 		memcpy(hist->pred, preds, sizeof(pred_t) * hist->pred_n);
 		pred_sort(hist->pred, hist->pred_n);
 
-		pred_t *cri = MYmalloc(sizeof(pred_t) * cri_i);
-		memcpy(cri, cons_read_hists, sizeof(pred_t) * cri_i);
-		pred_sort(cri, cri_i);
+		pred_t *crh = MYcalloc(sizeof(pred_t) * crh_i);
+		memcpy(crh, cons_read_hists, sizeof(pred_t) * crh_i);
+		pred_sort(crh, crh_i);
 #ifdef __DEBUG__
 		pred_check(hist->pred, hist->pred_n);
-		printh(hist);
 #endif
 
-		if (closed(hist, cri, cri_i)) {
+		if (closed(hist, crh, crh_i)) {
 			size_mark(hist);
 			// Add the newly created history to the list of possible
 			// extensions
 			pe_insert(hist);
-		}
 #ifdef __DEBUG__
-		else fprintf(stderr, "Found not closed possible extension\n");
+		} else
+			fprintf(stderr, "Found not closed possible extension: ");
+		printh(hist);
 #endif
 	}
 }
@@ -437,35 +452,32 @@ void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
  * histories
  */
 void find_subset_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds, pred_t *cons_read_hists,
-                     int s_i, int pred_i, int cri_i, int i, int j, int added)
+					 int s_i, int pred_i, int crh_i, int i, int j, int added)
 {
 	co_cond_t *cond = S[s_i].conds + i;
 	if (j>=0) {
+		// predecessors without cond->hists[j]
+		find_subset_rec(t, S, h, preds, cons_read_hists, s_i, pred_i, crh_i, i,
+			j-1, added);
+
 		if (!hist_c(cond->hists[j], cond->cond)) {
-			// predecessors without cond->hists[j]
-                        find_subset_rec(t, S, h, preds, cons_read_hists, s_i, pred_i, cri_i, i,
-					j-1, added);
+			// predecessors with cond->hists[j] are only causal read histories
+			preds[pred_i].cond = cond->cond;
+			CLEAR_FLAGS(preds[pred_i].flags);
+			SET_FLAG(preds[pred_i].flags, PRESET);
+			SET_FLAG(preds[pred_i].flags, HIST_R);
+			preds[pred_i].hist = cond->hists[j];
 
-                        // predecessors with cond->hists[j]
-                        preds[pred_i].cond = cond->cond;
-                        CLEAR_FLAGS(preds[pred_i].flags);
-                        SET_FLAG(preds[pred_i].flags, PRESET);
-                        SET_FLAG(preds[pred_i].flags, HIST_R);
-                        preds[pred_i].hist = cond->hists[j];
-
-                        cons_read_hists[cri_i].cond = cond->cond;
-                        cons_read_hists[cri_i].hist = cond->hists[j];
+			cons_read_hists[crh_i].cond = cond->cond;
+			cons_read_hists[crh_i].hist = cond->hists[j];
+			cons_read_hists[crh_i].flags = 0;
 			if (pairwise_concurrent(preds, pred_i)) {
-                                find_subset_rec(t, S, h, preds, cons_read_hists, s_i,
-                                                     pred_i+1, cri_i+1, i, j-1, added+1);
+				find_subset_rec(t, S, h, preds, cons_read_hists, s_i,
+								pred_i+1, crh_i+1, i, j-1, added+1);
 			}
-		} else {
-			// Causal history, ignore it
-			find_subset_rec(t, S, h, preds, cons_read_hists, s_i,
-							pred_i, cri_i, i, j-1, added);
 		}
 	} else if (added > 0) {
-                find_pred_rec(t, S, h, preds, cons_read_hists, s_i+1, pred_i, cri_i);
+		find_pred_rec(t, S, h, preds, cons_read_hists, s_i+1, pred_i, crh_i);
 	}
 }
 
@@ -483,11 +495,14 @@ void find_pred(trans_t *t, co_t *S, hist_t *h)
 				max_h = S[i].conds->hists_len;
 		pred_size += max_h;
 	}
-        // List of consumed read histories, represented as pairs <condition, history>
-        pred_t *cons_read_hists = MYmalloc(sizeof(pred_t) * pred_size);
+#ifdef __DEBUG__
+	check_co(S);
+#endif
+	// List of consumed read histories, represented as pairs <condition, history>
+	pred_t *cons_read_hists = MYcalloc(sizeof(pred_t) * pred_size);
 	pred_size += t->readarc_size;
-	pred_t *preds = MYmalloc(sizeof(pred_t) * pred_size);
-        find_pred_rec(t, S, h, preds, cons_read_hists, 0, 0, 0);
+	pred_t *preds = MYcalloc(sizeof(pred_t) * pred_size);
+	find_pred_rec(t, S, h, preds, cons_read_hists, 0, 0, 0);
 	free(preds);
 }
 

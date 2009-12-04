@@ -9,8 +9,11 @@ typedef unsigned char UNFbool;
  * array of pointers
  */
 typedef struct array_t {
+	/// array data
 	void **data;
+	/// lenght of the array
 	int len;
+	/// number of present elements
 	int count;
 } array_t;
 
