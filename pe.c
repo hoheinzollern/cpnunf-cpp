@@ -95,7 +95,7 @@ hist_t *pe_pop ()
  */
 array_t *im_post_context(event_t *e)
 {
-	int len = e->postset->len + e->readarcs->len;
+	int len = e->postset->count + e->readarcs->count;
 	array_t *places = array_new(len);
 	int i = 0;
 	for (i = 0; i < e->postset->count; i++)
@@ -348,13 +348,11 @@ UNFbool closed(hist_t *h, pred_t *crh, int crh_n) {
 		sent = closed_rec(h->pred[i].hist, crh, crh_n);
 	for (i = 0; i < h->pred_n; i++)
 		closed_clean(h->pred[i].hist);
-	free(crh);
 	return sent;
 }
 
 void find_subset_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
-					 pred_t *cons_read_hists, int s_i, int pred_i, int crh_i,
-                     int i, int j, int added);
+					 int s_i, int pred_i, int i, int j, int added);
 
 /**
   * Generates all possible tubsets of predecessors, checking at each step that
@@ -366,7 +364,7 @@ void find_subset_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
   *        image of a place in \f$\,^\bullet tr \cup \underline{tr}\f$.
   */
 void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
-				   pred_t *cons_read_hists, int s_i, int pred_i, int crh_i)
+				   int s_i, int pred_i)
 {
 	int i;
 	if (s_i < t->preset_size) {
@@ -375,7 +373,7 @@ void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
 #ifdef __DEBUG__
 			if (i < S[s_i].len -1) g_assert(S[s_i].conds[i].cond < S[s_i].conds[i+1].cond);
 #endif
-			find_subset_rec(t, S, h, preds, cons_read_hists, s_i, pred_i, crh_i, i,
+			find_subset_rec(t, S, h, preds, s_i, pred_i, i,
 							S[s_i].conds[i].hists_len - 1, 0);
 		}
 	}
@@ -400,8 +398,8 @@ void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
 				preds[pred_i].hist = cond->hists[j];
 				if (hist_c(cond->hists[j], cond->cond) &&
 				    pairwise_concurrent(preds, pred_i))
-						find_pred_rec(t, S, h, preds, cons_read_hists,
-									  s_i+1, pred_i+1, crh_i);
+						find_pred_rec(t, S, h, preds,
+									  s_i+1, pred_i+1);
 			}
 		}
 	} else {
@@ -427,14 +425,14 @@ void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
 		memcpy(hist->pred, preds, sizeof(pred_t) * hist->pred_n);
 		pred_sort(hist->pred, hist->pred_n);
 
-		pred_t *crh = MYcalloc(sizeof(pred_t) * crh_i);
-		memcpy(crh, cons_read_hists, sizeof(pred_t) * crh_i);
-		pred_sort(crh, crh_i);
+		//pred_t *crh = MYcalloc(sizeof(pred_t) * crh_i);
+		//memcpy(crh, cons_read_hists, sizeof(pred_t) * crh_i);
+		//pred_sort(crh, crh_i);
 #ifdef __DEBUG__
 		pred_check(hist->pred, hist->pred_n);
 #endif
 
-		if (closed(hist, crh, crh_i)) {
+		if (closed(hist, hist->pred, hist->pred_n)) {
 			size_mark(hist);
 			// Add the newly created history to the list of possible
 			// extensions
@@ -451,14 +449,13 @@ void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
  * Recursive function; computes all possible subsets of concurrent read
  * histories
  */
-void find_subset_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds, pred_t *cons_read_hists,
-					 int s_i, int pred_i, int crh_i, int i, int j, int added)
+void find_subset_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
+					 int s_i, int pred_i, int i, int j, int added)
 {
 	co_cond_t *cond = S[s_i].conds + i;
 	if (j>=0) {
 		// predecessors without cond->hists[j]
-		find_subset_rec(t, S, h, preds, cons_read_hists, s_i, pred_i, crh_i, i,
-			j-1, added);
+		find_subset_rec(t, S, h, preds, s_i, pred_i, i, j-1, added);
 
 		if (!hist_c(cond->hists[j], cond->cond)) {
 			// predecessors with cond->hists[j] are only causal read histories
@@ -468,16 +465,12 @@ void find_subset_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds, pred_t *cons
 			SET_FLAG(preds[pred_i].flags, HIST_R);
 			preds[pred_i].hist = cond->hists[j];
 
-			cons_read_hists[crh_i].cond = cond->cond;
-			cons_read_hists[crh_i].hist = cond->hists[j];
-			cons_read_hists[crh_i].flags = 0;
 			if (pairwise_concurrent(preds, pred_i)) {
-				find_subset_rec(t, S, h, preds, cons_read_hists, s_i,
-								pred_i+1, crh_i+1, i, j-1, added+1);
+				find_subset_rec(t, S, h, preds, s_i, pred_i+1, i, j-1, added+1);
 			}
 		}
 	} else if (added > 0) {
-		find_pred_rec(t, S, h, preds, cons_read_hists, s_i+1, pred_i, crh_i);
+		find_pred_rec(t, S, h, preds, s_i+1, pred_i);
 	}
 }
 
@@ -491,8 +484,8 @@ void find_pred(trans_t *t, co_t *S, hist_t *h)
 	for (i = 0; i < t->preset_size; i++) {
 		int max_h = 0;
 		for (j = 0; j < S[i].len; j++)
-			if (S[i].conds->hists_len > max_h)
-				max_h = S[i].conds->hists_len;
+			if (S[i].conds[j].hists_len > max_h)
+				max_h = S[i].conds[j].hists_len;
 		pred_size += max_h;
 	}
 #ifdef __DEBUG__
@@ -502,8 +495,9 @@ void find_pred(trans_t *t, co_t *S, hist_t *h)
 	pred_t *cons_read_hists = MYcalloc(sizeof(pred_t) * pred_size);
 	pred_size += t->readarc_size;
 	pred_t *preds = MYcalloc(sizeof(pred_t) * pred_size);
-	find_pred_rec(t, S, h, preds, cons_read_hists, 0, 0, 0);
+	find_pred_rec(t, S, h, preds, 0, 0);
 	free(preds);
+	free(cons_read_hists);
 }
 
 /**

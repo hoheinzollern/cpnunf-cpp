@@ -647,6 +647,16 @@ co_t *co_relation(hist_t *hist)
 	return result;
 }
 
+co_t *get_qco(cond_t *c, hist_t *h)
+{
+	int i;
+	for (i = 0; i < c->readarcs->count; i++) {
+		co_t *tmp = g_hash_table_lookup(((event_t*)array_get(c->readarcs, i))->qco, h);
+		if (tmp) return tmp;
+	}
+	return co_new(0);
+}
+
 /**
  * Computes the qco-relation given an enriched event.
  */
@@ -656,8 +666,7 @@ co_t *qco_relation(hist_t *hist)
 	// Store in tmp the union of qco in hist
 	co_t *tmp = co_new(0);
 	while (pred < last_pred) {
-		co_t *qco_b = g_hash_table_lookup(
-				pred->hist->e->qco, pred->hist);
+		co_t *qco_b = get_qco(pred->cond, pred->hist);
 		co_t *old_tmp = tmp;
 		tmp = co_union(qco_b, tmp);
 		co_finalize(old_tmp);
@@ -666,8 +675,7 @@ co_t *qco_relation(hist_t *hist)
 	pred = hist->pred;
 	while (pred < last_pred) {
 		co_t *co_b = get_co(pred->cond, pred->hist);
-		co_t *qco_b =
-			g_hash_table_lookup(pred->hist->e->qco, pred->hist);
+		co_t *qco_b = get_qco(pred->cond, pred->hist);
 		co_t *co_qco_b = co_union(co_b, qco_b);
 		co_finalize(co_b);
 		co_intersect(co_qco_b, tmp);
@@ -675,6 +683,13 @@ co_t *qco_relation(hist_t *hist)
 		pred++;
 	}
 	co_drop_preset(tmp, hist->e);
+
+	// Base: add read histories
+	pred = hist->pred;
+	for (; pred < last_pred; ++pred) {
+		if (HAS_FLAG(pred->flags, CONTEXT))
+			co_insert(tmp, pred->cond, pred->hist);
+	}
 
 	return tmp;
 }
@@ -735,8 +750,8 @@ void add_history(hist_t *hist)
 	g_hash_table_insert(hist->e->hist, hist, hist);
 	
 	// Computes co and qco relations
-	co_t *qco_rel = qco_relation(hist),
-		  *co_rel = co_relation(hist);
+	co_t *co_rel = co_relation(hist),
+		*qco_rel = qco_relation(hist);
 
 	print_co_qco(co_rel, qco_rel, hist);
 	
