@@ -200,11 +200,12 @@ void co_intersect(co_t *a, co_t *b)
  * takes a co structure and eliminates the preset of a given event
  * note that preset and the co structure are both ordered on conditions
  */
-void co_drop_preset(co_t *co, event_t *ev)
+void co_drop_preset(co_t *co, hist_t *h)
 {
+	event_t *ev = h->e;
 	array_t *pre = ev->preset;
 	int i = 0, cond = 0;
-	
+
 	while (i < pre->count && cond < co->len) {
 		if ((cond_t*)array_get(pre, i) == co->conds[cond].cond) {
 			free(co->conds[cond].hists);
@@ -216,38 +217,30 @@ void co_drop_preset(co_t *co, event_t *ev)
 			cond++;
 		}
 	}
-#ifdef __DEBUG__
-	for (i = 0; i < co->len; i++)
-		g_assert(co->conds[i].hists!=NULL);
-#endif
-}
 
-void co_drop_context(co_t *co, event_t *ev)
-{
-	array_t *ra = ev->readarcs;
-	int i = 0, cond = 0;
-	while (i < ra->count && cond < co->len) {
-		if ((cond_t*)array_get(ra, i) == co->conds[cond].cond) {
-			// remove causal histories
-			int j = 0;
-			for (; j < co->conds[cond].hists_len; j++) {
-				if (hist_c(co->conds[cond].hists[j], co->conds[cond].cond)) {
-					if (co->conds[cond].hists_len > 1) {
-						memmove(co->conds[cond].hists + j, co->conds[cond].hists + j + 1,
-								sizeof(hist_t *) * (co->conds[cond].hists_len - j - 1));
-						co->conds[cond].hists_len--;
-					} else {
+	pred_t *pred = h->pred, *last_pred = h->pred + h->pred_n;
+	cond = 0;
+	while (pred < last_pred && cond < co->len) {
+		if (pred->cond == co->conds[cond].cond) {
+			hist_t **hists = co->conds[cond].hists;
+			for (i = 0; i < co->conds[cond].hists_len; i++) {
+				if (hists[i] == pred->hist) {
+					if (i < co->conds[cond].hists_len - 1)
+						memmove(hists + i, hists + i + 1, sizeof(hist_t **) *
+							(co->conds[cond].hists_len - i + 1));
+					co->conds[cond].hists_len--;
+					if (co->conds[cond].hists_len == 0) {
 						free(co->conds[cond].hists);
 						memmove(co->conds + cond, co->conds + cond + 1,
-								sizeof(co_cond_t)*(co->len - cond - 1));
+							sizeof(co_cond_t)*(co->len - cond - 1));
 						co->len--;
 					}
 				}
 			}
-			cond++; i++;
-		} else {
+		} else if (pred->cond < co->conds[cond].cond)
+			pred++;
+		else
 			cond++;
-		}
 	}
 #ifdef __DEBUG__
 	for (i = 0; i < co->len; i++)
@@ -513,32 +506,10 @@ co_t *co_postset_e(hist_t *hist)
 	return co;
 }
 
-co_t *get_co(cond_t *cond, hist_t *hist)
-{
-	int j;
-	co_t *tmp, *co_b;
-	co_t *co = co_union(
-		(co_t*)g_hash_table_lookup(
-			cond->co_private, hist),
-		(co_t*)g_hash_table_lookup(
-			hist->e->co, hist)
-	);
-	for (j = 0; j < cond->readarcs->count; j++) {
-		co_b = (co_t*)g_hash_table_lookup(
-			((event_t*)array_get(cond->readarcs, j))->co, hist);
-		if (co_b) {
-			tmp = co;
-			co = co_union(co, co_b);
-			co_finalize(tmp);
-		}
-	}
-	return co;
-}
-
 /**
   *
   */
-void print_co_qco(co_t *co, co_t *qco, hist_t *h)
+void print_co(co_t *co, hist_t *h)
 {
 	int i, j;
 	fprintf(stderr, "e%d (%s)->co: ", h->e->num, h->e->origin->name);
@@ -547,15 +518,6 @@ void print_co_qco(co_t *co, co_t *qco, hist_t *h)
 			fprintf(stderr, "<b%d (%s), H[e%d]> ",
 				co->conds[i].cond->num, co->conds[i].cond->origin->name,
 				co->conds[i].hists[j]->e->num);
-		}
-	}
-	fprintf(stderr, "\n");
-	fprintf(stderr, "e%d (%s)->qco: ", h->e->num, h->e->origin->name);
-	for (i = 0; i < qco->len; i++) {
-		for (j = 0; j < qco->conds[i].hists_len; j++) {
-			fprintf(stderr, "<b%d (%s), H[e%d]> ",
-				qco->conds[i].cond->num, qco->conds[i].cond->origin->name,
-				qco->conds[i].hists[j]->e->num);
 		}
 	}
 	fprintf(stderr, "\n");
@@ -570,45 +532,16 @@ void print_co_qco(co_t *co, co_t *qco, hist_t *h)
  */
 co_t *co_relation(hist_t *hist)
 {
-	pred_t *pred = hist->pred;
+	pred_t *pred = hist->pred, *pred_last = hist->pred + hist->pred_n;
 	co_t *tmp = NULL;
-	array_t *ps = hist->e->preset, *ra = hist->e->readarcs;
-	int i = 0;
-	while (i < ps->count) {
-		while (pred->cond < (cond_t*)array_get(ps, i)) pred++;
-		while (pred < hist->pred + hist->pred_n
-			&& pred->cond == (cond_t*)array_get(ps, i)) {
-			co_t *co_b = get_co(pred->cond, pred->hist);
-			if (tmp) {
-				co_intersect(co_b, tmp);
-				co_finalize(co_b);
-			} else
-				tmp = co_b;
-			pred++;
-		}
-		i++;
+	while (pred < pred_last) {
+		if (tmp) {
+			co_intersect(pred->hist->co, tmp);
+		} else
+			tmp = co_copy(pred->hist->co);
+		pred++;
 	}
-	pred = hist->pred;
-	i = 0;
-	while (i < ra->count) {
-		while (pred->cond < (cond_t *)array_get(ra, i)) pred++;
-		// For read conditions only a causal history is chosen
-		if (pred < hist->pred + hist->pred_n) {
-			co_t *co_b = get_co(pred->cond, pred->hist);
-			co_t *co_qco_b = co_union(co_b,
-				g_hash_table_lookup(pred->hist->e->qco, pred->hist)
-						 );
-			co_finalize(co_b);
-			if (tmp) {
-				co_intersect(co_qco_b, tmp);
-				co_finalize(co_qco_b);
-			} else
-				tmp = co_qco_b;
-			pred++;
-		}
-		i++;
-	}
-	co_drop_preset(tmp, hist->e);
+	co_drop_preset(tmp, hist);
 	co_t *co_post = co_postset_e(hist);
 	co_t *result = co_union(tmp, co_post);
 #ifdef __DEBUG__
@@ -618,80 +551,7 @@ co_t *co_relation(hist_t *hist)
 #endif
 	co_finalize(tmp);
 	co_finalize(co_post);
-	
-	// Adds the reverse side of the relation:
-	array_t *post_e = hist->e->postset;
-	co_cond_t *co = result->conds, *last_co = result->conds + result->len;
-	for (; co < last_co; co++) {
-		hist_t **h = co->hists, **last_h = co->hists + co->hists_len;
-		for (; h < last_h; h++) {
-			co_t *co_b1 = g_hash_table_lookup(co->cond->co_private,
-							   *h);
-			if (co_b1 == NULL) {
-				co_b1 = co_new(0);
-				g_hash_table_insert(co->cond->co_private, *h,
-						     co_b1);
-			}
-
-			for (i = 0; i < post_e->count; i++) {
-				cond_t *b = (cond_t *)array_get(post_e, i);
-				co_insert(co_b1, b, hist);
-			}
-
-			for (i = 0; i < ra->count; i++) {
-				cond_t *b = (cond_t *)array_get(ra, i);
-				co_insert(co_b1, b, hist);
-			}
-		}
-	}
 	return result;
-}
-
-co_t *get_qco(cond_t *c, hist_t *h)
-{
-	int i;
-	for (i = 0; i < c->readarcs->count; i++) {
-		co_t *tmp = g_hash_table_lookup(((event_t*)array_get(c->readarcs, i))->qco, h);
-		if (tmp) return tmp;
-	}
-	return co_new(0);
-}
-
-/**
- * Computes the qco-relation given an enriched event.
- */
-co_t *qco_relation(hist_t *hist)
-{
-	pred_t *pred = hist->pred, *last_pred = hist->pred + hist->pred_n;
-	// Store in tmp the union of qco in hist
-	co_t *tmp = co_new(0);
-	while (pred < last_pred) {
-		co_t *qco_b = get_qco(pred->cond, pred->hist);
-		co_t *old_tmp = tmp;
-		tmp = co_union(qco_b, tmp);
-		co_finalize(old_tmp);
-		pred++;
-	}
-	pred = hist->pred;
-	while (pred < last_pred) {
-		co_t *co_b = get_co(pred->cond, pred->hist);
-		co_t *qco_b = get_qco(pred->cond, pred->hist);
-		co_t *co_qco_b = co_union(co_b, qco_b);
-		co_finalize(co_b);
-		co_intersect(co_qco_b, tmp);
-		co_finalize(co_qco_b);
-		pred++;
-	}
-	co_drop_preset(tmp, hist->e);
-
-	// Base: add read histories
-	pred = hist->pred;
-	for (; pred < last_pred; ++pred) {
-		if (HAS_FLAG(pred->flags, CONTEXT))
-			co_insert(tmp, pred->cond, pred->hist);
-	}
-
-	return tmp;
 }
 
 /**
@@ -750,17 +610,11 @@ void add_history(hist_t *hist)
 	g_hash_table_insert(hist->e->hist, hist, hist);
 	
 	// Computes co and qco relations
-	co_t *co_rel = co_relation(hist),
-		*qco_rel = qco_relation(hist);
+	hist->co = co_relation(hist);
 
-	print_co_qco(co_rel, qco_rel, hist);
-	
-	g_hash_table_insert(hist->e->co, hist, co_rel);
-	g_hash_table_insert(hist->e->qco, hist, qco_rel);
+	print_co(hist->co, hist);
 
 #ifdef __DEBUG__
-	check_co(co_rel);
-	check_co(qco_rel);
 	int i;
 	for (i = 0; i < net->numpl; i++)
 		g_assert(hist->marking[i] == 0 || hist->marking[i] == 1);
@@ -824,9 +678,6 @@ void unfold ()
 		ps = ps->next;
 	}
 	array_sort(post);
-	
-	ev->co = g_hash_table_new(NULL, NULL);
-	ev->qco = g_hash_table_new(NULL, NULL);
 	ev->hist = g_hash_table_new(NULL, NULL);
 	
 	// empty history for root event
@@ -842,10 +693,8 @@ void unfold ()
 		co->conds[i].hists = (hist_t **)MYmalloc(sizeof(hist_t *));
 		co->conds[i].hists_len = 1;
 		co->conds[i].hists[0] = h0;
-		g_hash_table_insert(co->conds[i].cond->co_private, h0, co_new(0));
 	}
-	g_hash_table_insert(ev->co, h0, co);
-	g_hash_table_insert(ev->qco, h0, co_new(0));
+	h0->co = co;
 	g_hash_table_insert(unf->markings, h0->marking, h0);
 	
 	// Unfolding:
