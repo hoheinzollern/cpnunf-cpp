@@ -218,13 +218,13 @@ void co_drop_preset(co_t *co, hist_t *h)
 		}
 	}
 
-	pred_t *pred = h->pred, *last_pred = h->pred + h->pred_n;
+	/*pred_t *pred = h->pred, *last_pred = h->pred + h->pred_n;
 	cond = 0;
 	while (pred < last_pred && cond < co->len) {
 		if (pred->cond == co->conds[cond].cond) {
 			hist_t **hists = co->conds[cond].hists;
 			for (i = 0; i < co->conds[cond].hists_len; i++) {
-				if (hists[i] == pred->hist) {
+				if (hists[i] == pred->hist && hist_c(hists[i], co->conds[cond].cond)) {
 					if (i < co->conds[cond].hists_len - 1)
 						memmove(hists + i, hists + i + 1, sizeof(hist_t **) *
 							(co->conds[cond].hists_len - i + 1));
@@ -241,7 +241,7 @@ void co_drop_preset(co_t *co, hist_t *h)
 			pred++;
 		else
 			cond++;
-	}
+	}*/
 #ifdef __DEBUG__
 	for (i = 0; i < co->len; i++)
 		g_assert(co->conds[i].hists!=NULL);
@@ -543,7 +543,17 @@ co_t *co_relation(hist_t *hist)
 	}
 	co_drop_preset(tmp, hist);
 	co_t *co_post = co_postset_e(hist);
-	co_t *result = co_union(tmp, co_post);
+	co_t *result = tmp;
+	int i, j;
+	for (i = 0; i < result->len; i++) {
+		co_cond_t *cond = result->conds + i;
+		for (j = 0; j < cond->hists_len; j++) {
+			co_t *tmp = co_union(cond->hists[j]->co, co_post);
+			co_finalize(cond->hists[j]->co);
+			cond->hists[j]->co = tmp;
+		}
+	}
+	result = co_union(tmp, co_post);
 #ifdef __DEBUG__
 	check_co(tmp);
 	check_co(co_post);
