@@ -182,6 +182,8 @@ cond_t *nc_cond_new(place_t *pl, event_t *ev)
 	cond->postset = array_new(0);
 	cond->readarcs = array_new(0);
 	
+	cond->co_private = g_hash_table_new(NULL, NULL);
+	
 	return cond;
 }
 

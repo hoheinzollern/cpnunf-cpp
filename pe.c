@@ -197,6 +197,8 @@ UNFbool pairwise_concurrent(pred_t *preds, int j)
 	pred_t *pred = preds + j;
 	--j;
 	co_t *co_common = pred->hist->co;
+	co_t *co_private =
+		g_hash_table_lookup(pred->cond->co_private, pred->hist);
 	while (cont && j>0) {
 		// TODO: binary search to accelerate this process
 		int k, l;
@@ -207,6 +209,16 @@ UNFbool pairwise_concurrent(pred_t *preds, int j)
 					for (l = 0; !found &&
 						l < co_common->conds[k].hists_len; l++)
 						if (co_common->conds[k].hists[l] ==
+						preds[j].hist)
+							found = UNF_TRUE;
+				}
+			}
+		if (co_private != NULL)
+			for (k = 0; !found && k < co_private->len; k++) {
+				if (co_private->conds[k].cond == preds[j].cond) {
+					for (l = 0; !found &&
+						l < co_private->conds[k].hists_len; l++)
+						if (co_private->conds[k].hists[l] ==
 						preds[j].hist)
 							found = UNF_TRUE;
 				}
@@ -384,7 +396,7 @@ void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
 			for (j = 0; j < cond->hists_len; j++) {
 				preds[pred_i].hist = cond->hists[j];
 				if (hist_c(cond->hists[j], cond->cond) &&
-					pairwise_concurrent(preds, pred_i))
+				    pairwise_concurrent(preds, pred_i))
 						find_pred_rec(t, S, h, preds,
 									  s_i+1, pred_i+1);
 			}
@@ -478,10 +490,13 @@ void find_pred(trans_t *t, co_t *S, hist_t *h)
 #ifdef __DEBUG__
 	check_co(S);
 #endif
+	// List of consumed read histories, represented as pairs <condition, history>
+	pred_t *cons_read_hists = MYcalloc(sizeof(pred_t) * pred_size);
 	pred_size += t->readarc_size;
 	pred_t *preds = MYcalloc(sizeof(pred_t) * pred_size);
 	find_pred_rec(t, S, h, preds, 0, 0);
 	free(preds);
+	free(cons_read_hists);
 }
 
 /**
@@ -497,7 +512,7 @@ void pe (hist_t *h)
 
 	co_t *co = h->co;
 	int i;
-	for (i = 0; i<T->count; i++) {
+	for (i = 0; i < T->count; i++) {
 		trans_t *tr = array_get(T, i);
 #ifdef __DEBUG__
                 check_co(co);

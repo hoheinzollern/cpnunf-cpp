@@ -121,7 +121,6 @@ typedef struct hist_t {
 	/// needed to compute the cardinality
 	unsigned char flags;
 
-	/// set of concurrent pairs
 	struct co_t *co;
 } hist_t;
 
@@ -161,6 +160,9 @@ typedef struct cond_t
 	
 	/// used by marking_of
 	int mark;
+	
+	/// array of co-conditions
+	GHashTable *co_private;
 } cond_t;
 
 /**
