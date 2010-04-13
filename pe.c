@@ -294,43 +294,29 @@ void printh(hist_t *h)
   * predecessors for h')
   */
 UNFbool closed_rec(hist_t *h, pred_t *crh, int crh_n) {
-	if (!HAS_FLAG(h->flags, BLACK)) {
-		int i, j = 0;
-		array_t *ra = h->e->readarcs;
-		UNFbool sent = UNF_TRUE;
-		for (i = 0; i < ra->count && sent; i++) {
-			while (j < crh_n && crh[j].cond < (cond_t *)ra->data[i]) j++;
-			if (j < crh_n && crh[j].cond == ra->data[i]) {
-				// Consumed condition found in the set of consumed read histories:
-				// check for the presence of h in c.r.i.
-				sent = UNF_FALSE;
-				int k = j;
-				while (k < crh_n && crh[k].cond == crh[j].cond && crh[k].hist != h)
-					k++;
-				if (k < crh_n && crh[k].cond == crh[j].cond && crh[k].hist == h)
-					sent = UNF_TRUE;
-			}
+	int i, j = 0;
+	array_t *ra = h->e->readarcs;
+	UNFbool sent = UNF_TRUE;
+	for (i = 0; i < ra->count && sent; i++) {
+		while (j < crh_n && crh[j].cond < (cond_t *)ra->data[i]) j++;
+		while (j < crh_n && crh[j].cond == ra->data[i]) {
+			// Consumed condition found in the set of consumed read histories:
+			// check for the presence of h in c.r.i.
+			sent = UNF_FALSE;
+			int k = j;
+			while (k < crh_n && crh[k].cond == crh[j].cond && crh[k].hist != h)
+				k++;
+			if (k < crh_n && crh[k].cond == crh[j].cond && crh[k].hist == h)
+				sent = UNF_TRUE;
+			j++;
 		}
-		if (sent) {
-			for (i = 0; i < h->pred_n && sent; i++)
-				sent = closed_rec(h->pred[i].hist, crh, crh_n);
-			return sent;
-		} else
-			return UNF_FALSE;
-	} else
-		return UNF_TRUE;
-}
-
-/**
-  * cleans h from BLACK flags used by closed_rec
-  */
-void closed_clean(hist_t *h) {
-	if (HAS_FLAG(h->flags, BLACK)) {
-		CLEAN_FLAG(h->flags, BLACK);
-		int i;
-		for (i = 0; i < h->pred_n; i++)
-			closed_clean(h->pred[i].hist);
 	}
+	if (sent) {
+		for (i = 0; i < h->pred_n && sent; i++)
+			sent = closed_rec(h->pred[i].hist, crh, crh_n);
+		return sent;
+	} else
+		return UNF_FALSE;
 }
 
 /**
@@ -345,8 +331,6 @@ UNFbool closed(hist_t *h, pred_t *crh, int crh_n) {
 	int i;
 	for (i = 0; i < h->pred_n && sent; i++)
 		sent = closed_rec(h->pred[i].hist, crh, crh_n);
-	for (i = 0; i < h->pred_n; i++)
-		closed_clean(h->pred[i].hist);
 	return sent;
 }
 
@@ -424,9 +408,6 @@ void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
 		memcpy(hist->pred, preds, sizeof(pred_t) * hist->pred_n);
 		pred_sort(hist->pred, hist->pred_n);
 
-		//pred_t *crh = MYcalloc(sizeof(pred_t) * crh_i);
-		//memcpy(crh, cons_read_hists, sizeof(pred_t) * crh_i);
-		//pred_sort(crh, crh_i);
 #ifdef __DEBUG__
 		pred_check(hist->pred, hist->pred_n);
 #endif
@@ -436,8 +417,9 @@ void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
 			// Add the newly created history to the list of possible
 			// extensions
 			pe_insert(hist);
+		}
 #ifdef __DEBUG__
-		} else
+		else
 			fprintf(stderr, "Found not closed possible extension: ");
 		printh(hist);
 #endif
@@ -515,12 +497,14 @@ void pe (hist_t *h)
 	for (i = 0; i < T->count; i++) {
 		trans_t *tr = array_get(T, i);
 #ifdef __DEBUG__
-                check_co(co);
+		check_co(co);
 #endif
 		co_t *S = test_trans(tr, co);
 		if (S != NULL) {
 			// *t U _t_ is a subset of im(co)
+#ifdef __DEBUG__
 			fprintf(stderr, "Testing %s\n", tr->name);
+#endif
 			find_pred(tr, S, h);
 			co_array_finalize(S, tr->preset_size +
 					  tr->readarc_size);

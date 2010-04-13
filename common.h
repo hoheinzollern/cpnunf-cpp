@@ -10,8 +10,6 @@
 #include <stdlib.h>
 #include "array.h"
 
-#define __DEBUG__
-
 #define PROGRAM_NAME "unfold"
 
 extern void* MYmalloc(size_t);

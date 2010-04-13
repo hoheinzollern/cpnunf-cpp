@@ -625,9 +625,9 @@ void add_history(hist_t *hist)
 	// Computes co and qco relations
 	hist->co = co_relation(hist);
 
+#ifdef __DEBUG__
 	print_co(hist->co, hist);
 
-#ifdef __DEBUG__
 	int i;
 	for (i = 0; i < net->numpl; i++)
 		g_assert(hist->marking[i] == 0 || hist->marking[i] == 1);
