@@ -646,6 +646,7 @@ UNFbool cutoff(hist_t *h1)
 {
 	hist_t *h2 = g_hash_table_lookup(unf->markings, h1->marking);
 	if (h2 != NULL) {
+#ifdef __DEBUG__
 		int i;
 		fprintf(stderr, "H[%s]: ", h1->e->origin->name);
 		for (i = 0; i < net->numpl; i++)
@@ -658,6 +659,7 @@ UNFbool cutoff(hist_t *h1)
 		for (i = 0; i < net->numpl; i++)
 			fprintf(stderr, "%d", h2->marking[i]);
 		fprintf(stderr, "\n\n");
+#endif
 		return (pe_compare(h1, h2) > 0);
 	} else {
 		return UNF_FALSE;

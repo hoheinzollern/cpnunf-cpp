@@ -129,7 +129,9 @@ int size_mark_rec(hist_t *hist, guchar *marking)
 	} else if (!HAS_FLAG(hist->flags, BLACK)) {
 		SET_FLAG(hist->flags, BLACK);
 		parikh_add(hist->e->origin->num);
+#ifdef __DEBUG__
 		fprintf(stderr, "%s ", hist->e->origin->name);
+#endif
 
 		int size = 1;
 		pred_t *pred = hist->pred, *last = hist->pred + hist->pred_n;
@@ -165,13 +167,17 @@ void size_mark_clean(hist_t *hist)
 
 void size_mark(hist_t *hist)
 {
+#ifdef __DEBUG__
 	fprintf(stderr, "H:");
+#endif
 	parikh_reset();
 	hist->marking = (guchar *)MYcalloc(sizeof(guchar) * net->numpl);
 	hist->size = size_mark_rec(hist, hist->marking);
 	hist->parikh = parikh_save();
 	size_mark_clean(hist);
+#ifdef __DEBUG__
 	fprintf(stderr, "\n");
+#endif
 }
 
 /**
@@ -372,8 +378,8 @@ int pe_compare (hist_t *pe1, hist_t *pe2)
 	if (pe1->size > pe2->size) return 1;
 
 	// Then decide by comparing the Parikh vectors.
-	if ((res = parikh_compare(pe1->parikh, pe2->parikh)))
-		return res;
+///	if ((res = parikh_compare(pe1->parikh, pe2->parikh)))
+///		return res;
 
 	return 0;
 	// TODO:
