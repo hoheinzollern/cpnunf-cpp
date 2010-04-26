@@ -203,22 +203,26 @@ void co_intersect(co_t *a, co_t *b)
 void co_drop_preset(co_t *co, event_t *ev)
 {
 	array_t *pre = ev->preset;
-	int i = 0, cond = 0;
+	int i = 0, j = 0;
 	
-	while (i < pre->count && cond < co->len) {
-		if ((cond_t*)array_get(pre, i) == co->conds[cond].cond) {
-			free(co->conds[cond].hists);
-			memmove(co->conds + cond, co->conds + cond + 1,
-				sizeof(co_cond_t)*(co->len - cond - 1));
-			cond++; i++;
+	while (i < pre->count && j < co->len) {
+		if ((cond_t*)array_get(pre, i) == co->conds[j].cond) {
+			free(co->conds[j].hists);
+			memmove(co->conds + j, co->conds + j + 1,
+				sizeof(co_cond_t)*(co->len - j - 1));
+			j++; i++;
 			co->len--;
-		} else {
-			cond++;
-		}
+		} else if ((cond_t*)array_get(pre, i) < co->conds[j].cond)
+			i++;
+		else
+			j++;
 	}
 #ifdef __DEBUG__
-	for (i = 0; i < co->len; i++)
+	for (i = 0; i < co->len; i++) {
 		g_assert(co->conds[i].hists!=NULL);
+		for (j = 0; j < pre->count; j++)
+			g_assert(co->conds[i].cond != array_get(pre, i));
+	}
 #endif
 }
 
@@ -482,12 +486,9 @@ co_t *co_postset_e(hist_t *hist)
 
 co_t *get_co(cond_t *cond, hist_t *hist)
 {
-	co_t *co = co_union(
-		(co_t*)g_hash_table_lookup(
-			cond->co_private, hist),
-		hist->co
-	);
-	return co;
+	co_t *priv = (co_t*)g_hash_table_lookup(cond->co_private, hist);
+	if (priv) return co_union(priv, hist->co);
+	else return co_copy(hist->co);
 }
 
 /**
@@ -499,9 +500,10 @@ void print_co(co_t *co, hist_t *h)
 	fprintf(stderr, "e%d (%s)->co: ", h->e->num, h->e->origin->name);
 	for (i = 0; i < co->len; i++) {
 		for (j = 0; j < co->conds[i].hists_len; j++) {
-			fprintf(stderr, "<b%d (%s), H[e%d]> ",
-				co->conds[i].cond->num, co->conds[i].cond->origin->name,
-				co->conds[i].hists[j]->e->num);
+			trans_t *t = co->conds[i].hists[j]->e->origin;
+			fprintf(stderr, "<%s, %s> ",
+				co->conds[i].cond->origin->name,
+				t ? t->name : "0");
 		}
 	}
 	fprintf(stderr, "\n");
@@ -536,17 +538,16 @@ co_t *co_relation(hist_t *hist)
 	check_co(co_post);
 	check_co(result);
 #endif
-	co_finalize(tmp);
 	co_finalize(co_post);
 	
 	// Adds the reverse side of the relation:
 	array_t *ps = hist->e->postset, *ra = hist->e->readarcs;
-	co_cond_t *co = result->conds, *last_co = result->conds + result->len;
+	co_cond_t *co = tmp->conds, *last_co = tmp->conds + tmp->len;
 	for (; co < last_co; co++) {
 		hist_t **h = co->hists, **last_h = co->hists + co->hists_len;
 		for (; h < last_h; h++) {
-			co_t *co_b1 = g_hash_table_lookup(co->cond->co_private,
-							   *h);
+			co_t *co_b1 = g_hash_table_lookup(co->cond->co_private, *h);
+
 			if (co_b1 == NULL) {
 				co_b1 = co_new(0);
 				g_hash_table_insert(co->cond->co_private, *h,
@@ -564,6 +565,7 @@ co_t *co_relation(hist_t *hist)
 			}
 		}
 	}
+	co_finalize(tmp);
 	return result;
 }
 

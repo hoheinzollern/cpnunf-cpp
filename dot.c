@@ -12,8 +12,8 @@
 void print_dot_event(event_t *ev)
 {
 	if (ev->num != -1)
-		printf("  e%d [label=\"e%d (%s)\" shape=box];\n",
-			ev->num,ev->num,ev->origin->name);
+		printf("  e%d [label=\"%s (e%d)\" shape=box];\n",
+			ev->num, ev->origin->name, ev->num);
 }
 
 void print_dot_readarcs(cond_t *co)
@@ -40,8 +40,8 @@ void print_dot_postset(cond_t *co)
 
 void print_dot_condition(cond_t *co)
 {
-	printf("  b%d [label=\"b%d (%s)\" shape=circle];\n",
-			co->num,co->num,co->origin->name);
+	printf("  b%d [label=\"%s (b%d)\" shape=circle];\n",
+			co->num, co->origin->name, co->num);
 	if (co->pre_ev->num != -1)
 		printf("  e%d -> b%d;\n", co->pre_ev->num, co->num);
 	print_dot_postset(co);
@@ -80,8 +80,8 @@ void print_dot_cutoff(hist_t *h)
 	UNFbool created;
 	event_t *ev = get_or_create_event(h, &created);
 	if (created) {
-		printf("  e%d [label=\"e%d (%s)\" shape=box style=dashed];\n",
-			ev->num, ev->num, ev->origin->name);
+		printf("  e%d [label=\"%s (e%d)\" shape=box style=dashed];\n",
+			ev->num, ev->origin->name, ev->num);
 		int i = 0;
 		for (i = 0; i < ev->preset->count; i++) {
 			cond_t *co = (cond_t*)array_get(ev->preset, i);

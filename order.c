@@ -181,205 +181,20 @@ void size_mark(hist_t *hist)
 }
 
 /**
- * Computes ordering information for the possible extension e=(tr,pe_conds)
- * and returns a queue entry with that information. The ordering information
- * consists of the size and Parikh vector of [e]; the Foata normal form is
- * computed only when necessary.
- *
-pe_queue_t* create_queue_entry (trans_t *tr)
-{
-	pe_queue_t *qu_new;
-	event_t *ev, **queue;
-	cond_t  *co, **co_ptr;
-	nodelist_t *list;
-	int sz;
-
-	ev_mark++;
-	*(queue = events) = NULL;
-
-	parikh_reset();
-	parikh_add(tr->num);
-
-	// add the input events of the pre-conditions into the queue 
-	for (sz = tr->preset_size, co_ptr = pe_conds; sz--; )
-	{
-		(co = *co_ptr++)->mark = ev_mark;
-		if ((ev = co->pre_ev) && ev->mark != ev_mark)
-			(*++queue = ev)->mark = ev_mark;
-	}
-
-	while ((ev = *queue))
-	{
-		queue--;
-		parikh_add(ev->origin->num);
-
-		// add the immediate predecessor events of ev to the queue
-		for (sz = ev->origin->preset_size, co_ptr = ev->preset; sz--; )
-		{
-			(co = *co_ptr++)->mark = ev_mark;
-			if ((ev = co->pre_ev) && ev->mark != ev_mark)
-				(*++queue = ev)->mark = ev_mark;
-		}
-	}
-
-	// create the queue element
-        qu_new = MYmalloc(sizeof(pe_queue_t));
-        qu_new->trans = tr;
-
-        // copy the pre-conditions
-        qu_new->conds = MYmalloc(tr->preset_size * sizeof(cond_t*));
-        memcpy(qu_new->conds,pe_conds,tr->preset_size*sizeof(cond_t*));
-
-	// copy Parikh vector
-	qu_new->p_vector = parikh_save();
-	qu_new->lc_size = parikh_count;
-
-	// now compute the marking
-	ev_mark++;
-	*(queue = events) = NULL;
-	qu_new->marking = NULL;
-
-	for (sz = tr->preset_size, co_ptr = pe_conds; sz--; )
-		if ((ev = (*co_ptr++)->pre_ev) && ev->mark != ev_mark)
-			(*++queue = ev)->mark = ev_mark;
-
-	while ((ev = *queue))
-	{
-		queue--;
-
-		// check off the postset conditions
-		for (sz = ev->origin->postset_size, co_ptr = ev->postset; sz--;)
-			if ((co = *co_ptr++)->mark != ev_mark-1)
-				nodelist_insert(&(qu_new->marking),co->origin);
-
-		// add the immediate predecessor events of ev to the queue
-		for (sz = ev->origin->preset_size, co_ptr = ev->preset; sz--; )
-			if ((ev = (*co_ptr++)->pre_ev) && ev->mark != ev_mark)
-				(*++queue = ev)->mark = ev_mark;
-	}
-
-	// add the post-places of tr 
-	for (list = tr->postset; list; list = list->next)
-		nodelist_insert(&(qu_new->marking), list->node);
-
-	// add the places of unconsumed minimal conditions
-	for (list = unf->m0; list; list = list->next)
-		if ((co = list->node)->mark != ev_mark-1)
-			nodelist_insert(&(qu_new->marking), co->origin);
-
-	return qu_new;
-}
-*/
-
-/**
- * Determine the Foata level of a possible extension.
- *
-int find_foata_level (pe_queue_t *pe)
-{
-	int level = 1;
-	int sz = pe->trans->preset_size;
-        cond_t **co_ptr = pe->conds;
-	event_t *ev;
-
-	while (sz--)
-	{
-		if ((ev = (*co_ptr++)->pre_ev) && ev->foata_level >= level)
-			level = ev->foata_level + 1;
-	}
-
-	return level;
-}*/
-
-/**
- * Identify the "slices" of the Foata normal form in the local configuration
- * of the possible extension pe.
- *
-nodelist_t** create_foata_lists (pe_queue_t *pe)
-{
-	int sz, tr_level = find_foata_level(pe);
-	nodelist_t **fo = MYcalloc((tr_level + 2) * sizeof(nodelist_t*));
-	event_t *ev, **queue;
-	cond_t **co_ptr;
-
-	ev_mark++;
-	*(queue = events) = NULL;
-
-	for (sz = pe->trans->preset_size, co_ptr = pe->conds; sz--; )
-		if ((ev = (*co_ptr++)->pre_ev) && ev->mark != ev_mark)
-			(*++queue = ev)->mark = ev_mark;
-
-	nodelist_push(fo + tr_level,pe->trans);
-
-	while ((ev = *queue))
-	{
-		--queue;
-		nodelist_push(fo + ev->foata_level, ev->origin);
-
-		for (sz = ev->origin->preset_size, co_ptr = ev->preset; sz--; )
-			if ((ev = (*co_ptr++)->pre_ev) && ev->mark != ev_mark)
-				(*++queue = ev)->mark = ev_mark;
-	}
-
-	return fo;
-}
-*/
-
-/**
- * Compare the Foata normal form of two local configurations.
- *
-int foata_compare (pe_queue_t *pe1, pe_queue_t *pe2)
-{
-	// create the Foata "slices" for both configurations
-	nodelist_t **fo1 = create_foata_lists(pe1);
-	nodelist_t **fo2 = create_foata_lists(pe2);
-	nodelist_t **f1 = fo1+1, **f2 = fo2+1, *list;
-	parikh_t *pv1;
-	int res = 0, pc1;
-
-	while (*f1 && *f2)	// compare Parikh vectors, level by level
-	{
-		parikh_reset();
-		for (list = *f1; list; list = list->next)
-			parikh_add(((trans_t*)(list->node))->num);
-		pc1 = parikh_count; pv1 = parikh_save();
-
-		parikh_reset();
-		for (list = *f2; list; list = list->next)
-			parikh_add(((trans_t*)(list->node))->num);
-		parikh[++parikh_size].tr_num = 0;
-
-		res = pc1 - parikh_count;
-		if (!res) res = parikh_compare(pv1,parikh+1);
-		free(pv1);
-		if (res) break;
-
-		f1++, f2++;
-	}
-
-	for (f1 = fo1+1; *f1; f1++) nodelist_delete(*f1);
-	for (f2 = fo2+1; *f2; f2++) nodelist_delete(*f2);
-	free(fo1);
-	free(fo2);
-
-	return res;	// should never return 0
-}
-*/
-
-/**
  * Compares two possible extensions according to the <_E order from [ERV02].
  * Returns -1 if pe1 < pe2, and 1 if pe1 > pe2, 0 otherwise (can't happen?).
  */
 int pe_compare (hist_t *pe1, hist_t *pe2)
 {
-	int res;
+//	int res;
 
 	// Try to decide by local configuration size first.
 	if (pe1->size < pe2->size) return -1;
 	if (pe1->size > pe2->size) return 1;
 
 	// Then decide by comparing the Parikh vectors.
-///	if ((res = parikh_compare(pe1->parikh, pe2->parikh)))
-///		return res;
+//	if ((res = parikh_compare(pe1->parikh, pe2->parikh)))
+//		return res;
 
 	return 0;
 	// TODO:

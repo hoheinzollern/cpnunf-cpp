@@ -6,6 +6,7 @@
 
 #ifndef __COMMON_H__
 #define __COMMON_H__
+#define __DEBUG__
 
 #include <stdlib.h>
 #include "array.h"

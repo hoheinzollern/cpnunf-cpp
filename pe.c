@@ -268,21 +268,21 @@ void printhrec(hist_t *h)
 {
 	if (h->e->num != -1) {
 		pred_t *pred = h->pred, *last = h->pred + h->pred_n;
-		fprintf(stderr, "{");
+		fprintf(stderr, "%s { ", h->e->origin->name);
 		while (pred < last) {
+			fprintf(stderr, "%s ", pred->cond->origin->name);
 			printhrec(pred->hist);
-			fprintf(stderr, " %s ", pred->cond->origin->name);
 			pred++;
 		}
-		fprintf(stderr, "} %s", h->e->origin->name);
+		fprintf(stderr, "} ");
 	}
 }
 
 void printh(hist_t *h)
 {
-	fprintf(stderr, "Found H[%s] = {", h->e->origin->name);
+	fprintf(stderr, "Found H[%s] = ", h->e->origin->name);
 	printhrec(h);
-	fprintf(stderr, "}\n");
+	fprintf(stderr, "\n");
 }
 
 /**
@@ -299,16 +299,19 @@ UNFbool closed_rec(hist_t *h, pred_t *crh, int crh_n) {
 	UNFbool sent = UNF_TRUE;
 	for (i = 0; i < ra->count && sent; i++) {
 		while (j < crh_n && crh[j].cond < (cond_t *)ra->data[i]) j++;
-		while (j < crh_n && crh[j].cond == ra->data[i]) {
+		while (j < crh_n && crh[j].cond == ra->data[i] && sent) {
 			// Consumed condition found in the set of consumed read histories:
 			// check for the presence of h in c.r.i.
 			sent = UNF_FALSE;
 			int k = j;
 			while (k < crh_n && crh[k].cond == crh[j].cond && crh[k].hist != h)
 				k++;
-			if (k < crh_n && crh[k].cond == crh[j].cond && crh[k].hist == h)
+			if (k < crh_n && crh[k].cond == crh[j].cond && crh[k].hist == h) {
 				sent = UNF_TRUE;
-			j++;
+				j = k+1;
+			} else j = k;
+			if (!sent) fprintf(stderr, "does not consume <%s, %s>\n",
+					crh[j-1].cond->origin->name, h->e->origin->name);
 		}
 	}
 	if (sent) {
@@ -353,9 +356,6 @@ void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
 	if (s_i < t->preset_size) {
 		// Only for the preset: find subset of read histories
 		for (i = 0; i < S[s_i].len; i++) {
-#ifdef __DEBUG__
-			if (i < S[s_i].len -1) g_assert(S[s_i].conds[i].cond < S[s_i].conds[i+1].cond);
-#endif
 			find_subset_rec(t, S, h, preds, s_i, pred_i, i,
 							S[s_i].conds[i].hists_len - 1, 0);
 		}
@@ -380,7 +380,7 @@ void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
 			for (j = 0; j < cond->hists_len; j++) {
 				preds[pred_i].hist = cond->hists[j];
 				if (hist_c(cond->hists[j], cond->cond) &&
-				    pairwise_concurrent(preds, pred_i))
+					pairwise_concurrent(preds, pred_i))
 						find_pred_rec(t, S, h, preds,
 									  s_i+1, pred_i+1);
 			}
@@ -395,6 +395,13 @@ void find_pred_rec(trans_t *t, co_t *S, hist_t *h, pred_t *preds,
 		if (i == pred_i) // No condition has h as history, abort
 			return;
 
+		for (i = 0; i < pred_i; i++) {
+			if (preds[i].hist->e->num != -1)
+				fprintf(stderr, "<%s,%s> ", preds[i].cond->origin->name, preds[i].hist->e->origin->name);
+			else
+				fprintf(stderr, "<%s,0> ", preds[i].cond->origin->name);
+		}
+		fprintf(stderr, "\n");
 		// Create the history and add it to the list of possible
 		// extensions
 		hist_t *hist = (hist_t *)MYmalloc(sizeof(hist_t));
