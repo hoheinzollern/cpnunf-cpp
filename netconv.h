@@ -147,10 +147,10 @@ typedef struct cond_t
 	struct event_t *pre_ev;
 	
 	/// ordered array of postset
-	array_t *postset;
+	struct array_t *postset;
 	
 	/// read arcs (ordered)
-	array_t *readarcs;
+	struct array_t *readarcs;
 	
 	/// associated place
 	place_t *origin;
@@ -171,13 +171,13 @@ typedef struct cond_t
 typedef struct event_t
 {
 	/// array of preset/postset conditions
-	array_t *preset;
+	struct array_t *preset;
 	
 	/// size fixed by sizes of origin
-	array_t *postset;
+	struct array_t *postset;
 	
 	/// read arcs (ordered)
-	array_t *readarcs;
+	struct array_t *readarcs;
 	
 	/// associated transition
 	trans_t *origin;
