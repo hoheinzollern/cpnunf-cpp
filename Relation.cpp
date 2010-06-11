@@ -1,4 +1,6 @@
 #include "Relation.h"
+#include "Condition.h"
+#include "History.h"
 
 bool Pair::operator <(const Pair &p) const
 {
@@ -74,6 +76,34 @@ Relation *Relation::unionWith(Relation &r)
 	if (first2==last2) last = copy(first1, last1, last);
 	result->resize(last - result->begin());
 	return result;
+}
+
+void Relation::dropPreset(Event &e)
+{
+	vector<Condition*>::iterator presetIterator = e.preset.begin();
+	iterator first = end(), relationIterator = begin();
+	while (presetIterator != e.preset.end() && relationIterator != end()) {
+		if (*presetIterator < (*relationIterator).cond) {
+			if (first != end()) {
+				erase(first, relationIterator);
+				first = end();
+			}
+			++presetIterator;
+		} else if (*presetIterator > (*relationIterator).cond) {
+			if (first != end()) {
+				erase(first, relationIterator);
+				first = end();
+			}
+			++relationIterator;
+		} else {
+			if (first != end())
+				first = relationIterator;
+			++presetIterator;
+			++relationIterator;
+		}
+	}
+	if (first != end())
+		erase(first, relationIterator);
 }
 
 void Relation::sort(iterator __first, iterator __last) {

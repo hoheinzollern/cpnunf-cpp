@@ -21,7 +21,7 @@ public:
 	place_t *origin;
 	int num;
 	int mark;
-	map<History *, Relation *>co_private;
+	map<History *, Relation *>coPrivate;
 	Condition(Event *_pre, place_t *_origin);
 };
 

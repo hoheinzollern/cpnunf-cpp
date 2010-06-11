@@ -11,12 +11,16 @@ using namespace std;
 class Condition;
 class Event;
 class History;
+class Relation;
 
 class Predecessor {
-public:
+	friend class History;
+private:
 	unsigned char flags;
 	Condition *cond;
 	History *hist;
+public:
+	bool hasFlag(unsigned char flag);
 	bool operator < (const Predecessor &p) {
 		return cond < p.cond;
 	}
@@ -30,6 +34,9 @@ private:
 	vector <Predecessor> predecessors;
 	unsigned char flags;
 	Relation *co;
+public:
+	void findOrCreateEvent();
+	void computeConcurrency();
 };
 
 #endif

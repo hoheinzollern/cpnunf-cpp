@@ -2,14 +2,17 @@
 #define RELATION_H
 
 #include "netconv.h"
+#include "Event.h"
 #include <algorithm>
 #include <vector>
 using namespace std;
+class Condition;
+class History;
 
 class Pair {
 public:
-	cond_t *cond;
-	vector<hist_t *> hists;
+	Condition *cond;
+	vector<History *> hists;
 
 	bool operator<(const Pair &p) const;
 };
@@ -34,6 +37,7 @@ public:
 
 	void intersectWith(Relation &);
 	Relation *unionWith(Relation &);
+	void dropPreset(Event &);
 	void sort(iterator __first, iterator __last);
 };
 
