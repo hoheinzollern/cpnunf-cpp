@@ -1,4 +1,11 @@
 #include "History.h"
+#include "Condition.h"
+#include "Unfolding.h"
+
+bool Predecessor::hasFlag(unsigned char flag)
+{
+	// TODO
+}
 
 void History::findOrCreateEvent()
 {
@@ -10,10 +17,10 @@ void History::findOrCreateEvent()
 
 	vector<Event *>::iterator i = post.begin(), j = read.begin();
 	bool foundPost = false, foundRead = false;
-	while (i != post.end() && (*i).origin != t)
+	while (i != post.end() && (*i)->origin != t)
 		++i;
 	if (i != post.end()) foundPost = true;
-	while (!foundPost && j != read.end() && (*j).origin != t)
+	while (!foundPost && j != read.end() && (*j)->origin != t)
 		++j;
 	if (j != read.end()) foundRead = true;
 
@@ -29,7 +36,7 @@ void History::findOrCreateEvent()
 			}
 		}
 		event = new Event(preset, readarcs, t);
-		nc_add_event(e);
+		Unfolding::addEvent(event);
 	} else if (foundPost) {
 		event = *i;
 	} else {
@@ -42,20 +49,20 @@ void History::computeConcurrency()
 	vector <Predecessor>::iterator it = predecessors.begin();
 	Relation *tmp;
 	while (it != predecessors.end()) {
-		Relation *priv = (*it).cond->coPrivate[hist];
+		Relation *priv = (*it).cond->coPrivate[this];
 		if (tmp) {
 			if (priv) {
-				Relation co = priv->unionWith(*((*it).hist.co));
-				tmp->intersectWith(co);
+				Relation *co = priv->unionWith(*((*it).hist->co));
+				tmp->intersectWith(*co);
 				delete co;
 			} else {
-				tmp->intersectWith(*((*it).hist.co));
+				tmp->intersectWith(*(it->hist->co));
 			}
 		} else {
 			if (priv)
-				tmp = priv->unionWith((*it).hist.co);
+				tmp = priv->unionWith(*(it->hist->co));
 			else
-				tmp = new Relation((*it).hist.co);
+				tmp = new Relation(*(it->hist->co));
 		}
 		++it;
 	}

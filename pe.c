@@ -301,7 +301,7 @@ UNFbool closed_rec(hist_t *h, pred_t *crh, int crh_n) {
 		while (j < crh_n && crh[j].cond < (cond_t *)ra->data[i]) j++;
 		while (j < crh_n && crh[j].cond == ra->data[i] && sent) {
 			// Consumed condition found in the set of consumed read histories:
-			// check for the presence of h in c.r.i.
+			// check for the presence of h in crh
 			sent = UNF_FALSE;
 			int k = j;
 			while (k < crh_n && crh[k].cond == crh[j].cond && crh[k].hist != h)

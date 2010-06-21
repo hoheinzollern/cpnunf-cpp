@@ -32,12 +32,12 @@ void Relation::intersectWith(Relation &r)
 		if (*first1 < *first2) ++first1;
 		else if (*first2 < *first1) ++first2;
 		else {
-			vector<hist_t *>::iterator end = set_intersection(
+			vector<History *>::iterator it, end = set_intersection(
 					first1->hists.begin(), first1->hists.end(),
 					first2->hists.begin(), first2->hists.end(),
-					first1->hists.begin()
+					it
 				);
-			first1->hists.resize(end - first1->hists.begin());
+			first1->hists.resize(distance(first1->hists.begin(), end));
 			++first1; ++first2;
 		}
 	}
@@ -62,12 +62,12 @@ Relation *Relation::unionWith(Relation &r)
 			*last = Pair();
 			last->cond = first1->cond;
 			last->hists.resize(first1->hists.size() + first2->hists.size());
-			vector<hist_t *>::iterator end = set_union(
+			vector<History *>::iterator it, end = set_union(
 					first1->hists.begin(), first1->hists.end(),
 					first2->hists.begin(), first2->hists.end(),
-					last->hists.begin()
+					it
 				);
-			last->hists.resize(end - last->hists.begin());
+			last->hists.resize(distance(last->hists.begin(), end));
 			++last; ++first1; ++first2;
 		}
 

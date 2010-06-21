@@ -8,6 +8,7 @@
 using namespace std;
 class Condition;
 class History;
+class Event;
 
 class Pair {
 public:
