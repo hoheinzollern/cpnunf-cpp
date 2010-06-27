@@ -1,17 +1,53 @@
-Just compile and run
 
-	./mole your_example.ll_net
+	Contextual Petri Nets Unfolder
 
-The input format are PEP low-level nets extended with
-an additional section for read arcs. Some simple examples
-are in the Examples/ directory, hopefully they are enough
-to clarify the input syntax.
+An unfolder for Contextual Petri Nets based on the original work of Stefan
+Schwoon for Mora, a spin-off of the Mole unfolder for Contextual Petri Nets.
 
-Mole produces dot-compatible output, so you can get
-a Postscript file of the result by saying
+1. DEPENDENCIES
 
-	./mole your_example.ll_net | dot -Tps > your_example.ps
-	gv your_example.ps
+In order to build and use this software you need to have CMake and GLib
+installed. Future plans of development will dismiss GLib in favor of the
+C++ standard library structures. In order to meet these requirements in a
+debian based system you must execute from the terminal:
+
+	sudo apt-get install libglib2.0-dev cmake
+
+2. DOWNLOAD, BUILD AND RUN
+
+This software is located at:
+
+http://github.com/hoheinzollern/Contextual-Petri-Net-Unfolder
+
+To download the latest version of the source you can either use git:
+
+	git clone git://github.com/hoheinzollern/Contextual-Petri-Net-Unfolder.git unfolder
+
+.. or svn:
+
+	svn co https://svn.github.com/hoheinzollern/Contextual-Petri-Net-Unfolder.git unfolder
+
+After you checked out the sources you can build them:
+
+	cd unfolder
+	mkdir build
+	cd build
+	cmake ..
+	make
+
+Now run like this:
+
+	./unfolder your_example.ll_net
+
+The input format are PEP low-level nets extended with an additional section for
+read arcs. Some simple examples are in the Examples/ directory, hopefully they
+are enough to clarify the input syntax.
+
+The unfolder produces dot-compatible output, so you can get a PDF file of the
+result by saying
+
+	./unfolder your_example.ll_net | dot -Tpdf > your_example.pdf
+	xdg-open your_example.pdf
 
 Right now the tool has the following restrictions:
 * It works with safe nets only.
@@ -19,15 +55,9 @@ Right now the tool has the following restrictions:
   crash on any example other than the ones in the Example/ directory.
   Let me know of any bugs you encounter, including the examples that
   cause them.
-* The algorithm is actually cheating by reducing the problem to the
-  ones with consume/produce loops and then extracting the read-arc-
-  unfolding from that (bigger) unfolding ;-) Option -f outputs this
-  bigger unfolding instead.
 
-Stefan
+Please report any bugs you may encounter at:
 
+	http://github.com/hoheinzollern/Contextual-Petri-Net-Unfolder/issues
 
-Version history:
-* 0.0.1, March 19, 2007: initial version
-* 0.0.2, March 19, 2007: fixed compilation problems with gcc4
-* 0.0.3, March 21, 2007: added -f option
+Alessandro

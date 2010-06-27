@@ -27,6 +27,7 @@
 #define CONTEXT 0x08
 
 #define BLACK 0x10
+#define RED 0x20
 
 typedef unsigned char uchar;
 
@@ -122,6 +123,8 @@ typedef struct hist_t {
 	unsigned char flags;
 
 	struct co_t *co;
+
+	GHashTable *subsumed;
 } hist_t;
 
 /**

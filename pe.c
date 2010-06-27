@@ -4,6 +4,7 @@
 #include "test.h"
 #include <string.h>
 #include <stdio.h>
+#include "patch.h"
 
 /*****************************************************************************/
 
@@ -286,43 +287,6 @@ void printh(hist_t *h)
 }
 
 /**
-  * recursive function on the structure of an history:
-  * checks that if a condition b read by e is consumed in the newly created
-  * history h' also the history associated to e is also present in the list of
-  * predecessors of h' in a pair with b (only consumed read places are
-  * concerned, so we just take the crh array instead of the entire list of
-  * predecessors for h')
-  */
-UNFbool closed_rec(hist_t *h, pred_t *crh, int crh_n) {
-	int i, j = 0;
-	array_t *ra = h->e->readarcs;
-	UNFbool sent = UNF_TRUE;
-	for (i = 0; i < ra->count && sent; i++) {
-		while (j < crh_n && crh[j].cond < (cond_t *)ra->data[i]) j++;
-		while (j < crh_n && crh[j].cond == ra->data[i] && sent) {
-			// Consumed condition found in the set of consumed read histories:
-			// check for the presence of h in crh
-			sent = UNF_FALSE;
-			int k = j;
-			while (k < crh_n && crh[k].cond == crh[j].cond && crh[k].hist != h)
-				k++;
-			if (k < crh_n && crh[k].cond == crh[j].cond && crh[k].hist == h) {
-				sent = UNF_TRUE;
-				j = k+1;
-			} else j = k;
-			if (!sent) fprintf(stderr, "does not consume <%s, %s>\n",
-					crh[j-1].cond->origin->name, h->e->origin->name);
-		}
-	}
-	if (sent) {
-		for (i = 0; i < h->pred_n && sent; i++)
-			sent = closed_rec(h->pred[i].hist, crh, crh_n);
-		return sent;
-	} else
-		return UNF_FALSE;
-}
-
-/**
   * checks whether h is a closed history.
   * @arg h the history to be checked for closure
   * @arg crh the set of consumed read histories in h
@@ -330,10 +294,36 @@ UNFbool closed_rec(hist_t *h, pred_t *crh, int crh_n) {
   * @return the closure check result
   */
 UNFbool closed(hist_t *h, pred_t *crh, int crh_n) {
+
+	GHashTable *tbl = g_hash_table_new_full(&pred_hash, &pred_equal, &clean_pred, &free);
+
 	UNFbool sent = UNF_TRUE;
-	int i;
-	for (i = 0; i < h->pred_n && sent; i++)
-		sent = closed_rec(h->pred[i].hist, crh, crh_n);
+	int i, j;
+	for (i = 0; i < h->pred_n; i++)
+		build_subsumed(tbl, h->pred + i);
+
+	GHashTableIter iter;
+	g_hash_table_iter_init(&iter, tbl);
+	gpointer keyp, valuep;
+	while (g_hash_table_iter_next(&iter, &keyp, &valuep) && sent) {
+		pair_t *value = valuep;
+		pred_t *key = keyp;
+		if (HAS_FLAG(key->flags, RED)) {
+			for (i = 0; i < crh_n && sent; i++) {
+				if (pred_equal(value->origin, crh + i)) {
+					UNFbool found = UNF_FALSE;
+					for (j = 0; j < crh_n && !found; j++) {
+						if (pred_equal(value->produced, crh + j))
+							found = UNF_TRUE;
+					}
+					if (!found)
+						sent = UNF_FALSE;
+				}
+			}
+		}
+	}
+
+	g_hash_table_destroy(tbl);
 	return sent;
 }
 

@@ -8,6 +8,7 @@
 #include "test.h"
 #include <stdio.h>
 #include "output.h"
+#include "patch.h"
 
 net_t *net;	/* stores the net	*/
 unf_t *unf;	/* stores the unfolding */
@@ -210,7 +211,7 @@ void co_drop_preset(co_t *co, event_t *ev)
 			free(co->conds[j].hists);
 			memmove(co->conds + j, co->conds + j + 1,
 				sizeof(co_cond_t)*(co->len - j - 1));
-			j++; i++;
+			i++;
 			co->len--;
 		} else if ((cond_t*)array_get(pre, i) < co->conds[j].cond)
 			i++;
@@ -221,7 +222,7 @@ void co_drop_preset(co_t *co, event_t *ev)
 	for (i = 0; i < co->len; i++) {
 		g_assert(co->conds[i].hists!=NULL);
 		for (j = 0; j < pre->count; j++)
-			g_assert(co->conds[i].cond != array_get(pre, i));
+			g_assert(co->conds[i].cond != array_get(pre, j));
 	}
 #endif
 }
@@ -520,7 +521,7 @@ co_t *co_relation(hist_t *hist)
 {
 	pred_t *pred = hist->pred, *last_pred = hist->pred + hist->pred_n;
 	co_t *tmp = NULL;
-	int i = 0;
+	int i = 0, j = 0;
 	while (pred < last_pred) {
 		co_t *co = get_co(pred->cond, pred->hist);
 		if (tmp) {
@@ -539,6 +540,65 @@ co_t *co_relation(hist_t *hist)
 	check_co(result);
 #endif
 	co_finalize(co_post);
+
+	// PATCH! consider rewriting this using subsumption relations
+	pred_t p;
+	p.flags = 0;
+	for (i = 0; i < result->len; i++) {
+		p.cond = result->conds[i].cond;
+		for (j = 0; j < result->conds[i].hists_len; j++) {
+			p.hist = result->conds[i].hists[j];
+
+			GHashTable *tbl = g_hash_table_new_full(&pred_hash, &pred_equal, &clean_pred, &free);
+			build_subsumed(tbl, &p);
+
+			GHashTableIter iter;
+			g_hash_table_iter_init(&iter, tbl);
+			pred_t *key;
+			pair_t *value;
+			gpointer keyp, valuep;
+			UNFbool exit = UNF_FALSE;
+			while (g_hash_table_iter_next(&iter, &keyp, &valuep) && !exit) {
+				key = keyp;
+				value = valuep;
+				if (HAS_FLAG(key->flags, RED)) {
+					// find value->origin in the preset of hist
+					int k, l, m;
+					for (k = 0; k < hist->pred_n && !exit; k++) {
+						if (pred_equal(hist->pred + k, value->origin)) {
+							UNFbool found = UNF_FALSE;
+							for (l = 0; l < hist->pred_n; l++) {
+								if (pred_equal(hist->pred + l, value->produced)) {
+									found = UNF_TRUE;
+								}
+							}
+							if (!found) {
+								// Remove <b_i, h_j> from the concurrency relation
+								fprintf(stderr, "found a pair to be removed!\n");
+								if (result->conds[i].hists_len > 1) {
+									result->conds[i].hists_len--;
+									for (m = j; m < result->conds[i].hists_len; m++)
+										result->conds[i].hists[m] = result->conds[i].hists[m+1];
+								} else {
+									result->len--;
+									if (result->len > 0) {
+										free (result->conds[i].hists);
+										for (m = i; m < result->len; m++)
+											result->conds[m] = result->conds[m+1];
+									} else {
+										free (result->conds);
+									}
+								}
+								exit = UNF_TRUE;
+							}
+						}
+					}
+				}
+			}
+
+			g_hash_table_destroy(tbl);
+		}
+	}
 	
 	// Adds the reverse side of the relation:
 	array_t *ps = hist->e->postset, *ra = hist->e->readarcs;
